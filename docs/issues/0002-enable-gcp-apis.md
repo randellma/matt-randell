@@ -9,7 +9,7 @@ Enable the Cloud Domains and Cloud DNS APIs on the `matt-randell` GCP project vi
 
 ## Acceptance criteria
 
-- [ ] `google_project_service` resources defined in Terraform for `domains.googleapis.com` and `dns.googleapis.com`
-- [ ] `terraform plan` shows only the expected API enablement resources
-- [ ] `terraform apply` succeeds with no errors
-- [ ] Both APIs visible as enabled in the GCP console
+- [x] `google_project_service` resources defined in Terraform for `domains.googleapis.com` and `dns.googleapis.com`
+- [x] `terraform plan` shows only the expected API enablement resources
+- [x] `terraform apply` succeeds with no errors
+- [x] Both APIs visible as enabled in the GCP console
