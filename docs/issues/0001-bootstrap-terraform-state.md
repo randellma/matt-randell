@@ -11,7 +11,7 @@ The bucket must be created outside of Terraform (since Terraform needs it to exi
 
 ## Acceptance criteria
 
-- [ ] GCS bucket created via `gcloud storage buckets create` with versioning enabled
-- [ ] `terraform/backend.tf` configured to use the bucket
-- [ ] `terraform init` runs successfully against the GCS backend
-- [ ] No Terraform state committed to the repo
+- [x] GCS bucket created via `gcloud storage buckets create` with versioning enabled
+- [x] `terraform/backend.tf` configured to use the bucket
+- [x] `terraform init` runs successfully against the GCS backend
+- [x] No Terraform state committed to the repo
