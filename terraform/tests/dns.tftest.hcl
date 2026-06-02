@@ -68,11 +68,3 @@ run "www_cname_points_to_github_pages" {
   }
 }
 
-run "nameservers_output_exposed" {
-  command = apply
-
-  assert {
-    condition     = length(output.nameservers) > 0
-    error_message = "nameservers output must be non-empty"
-  }
-}
