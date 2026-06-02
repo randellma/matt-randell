@@ -9,8 +9,17 @@ Create a Cloud DNS managed zone for `mattrandell.com` and populate it with the D
 
 ## Acceptance criteria
 
-- [ ] `google_dns_managed_zone` resource created for `mattrandell.com`
-- [ ] A records added for the apex domain pointing to all four GitHub Pages IPs: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-- [ ] CNAME record added for `www.mattrandell.com` pointing to `randellma.github.io.`
-- [ ] Cloud DNS nameservers output by Terraform (needed for the domain transfer in #0004)
-- [ ] `terraform apply` succeeds with no errors
+- [x] `google_dns_managed_zone` resource created for `mattrandell.com`
+- [x] A records added for the apex domain pointing to all four GitHub Pages IPs: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
+- [x] CNAME record added for `www.mattrandell.com` pointing to `randellma.github.io.`
+- [x] Cloud DNS nameservers output by Terraform (needed for the domain transfer in #0004)
+- [x] `terraform apply` succeeds with no errors
+
+## Nameservers (for #0004)
+
+```
+ns-cloud-d1.googledomains.com.
+ns-cloud-d2.googledomains.com.
+ns-cloud-d3.googledomains.com.
+ns-cloud-d4.googledomains.com.
+```
