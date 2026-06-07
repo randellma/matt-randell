@@ -5,13 +5,13 @@
  *   [0] Captured at   — ISO timestamp
  *   [1] Photo         — null here; SheetGateway replaces it with a CellImage
  *   [2] Name
- *   [3] Disposition   — "Sell" | "Give away" | "Donate" | ""
+ *   [3] Disposition   — "Sell" | "Give away" | "Donate" | "Junk" | ""
  *   [4] Handled on    — blank at Capture time
  *   [5] Notes         — blank at Capture time
  *   [6] Drive image URL — kept so the listing routine can fetch the photo
  */
 
-export type Disposition = "Sell" | "Give away" | "Donate";
+export type Disposition = "Sell" | "Give away" | "Donate" | "Junk";
 
 export interface CapturePayload {
   name: string;

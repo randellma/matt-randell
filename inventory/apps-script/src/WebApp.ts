@@ -19,7 +19,7 @@ import { savePhoto } from "./DrivePhotoStore.js";
 import { appendCaptureRow } from "./SheetGateway.js";
 import type { Disposition } from "./CapturePayloadMapper.js";
 
-const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate"]);
+const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate", "Junk"]);
 
 // Note: Apps Script always returns HTTP 200; `status` is body-only, not the HTTP status code.
 // Clients must inspect the JSON body's `status` or `error` fields to detect failures.
@@ -66,11 +66,12 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
   }
 
   // Validate optional disposition before casting
+  // Empty string is treated as "no disposition" (same as omitting the field)
   const rawDisposition = body["disposition"];
-  if (rawDisposition !== undefined && (typeof rawDisposition !== "string" || !VALID_DISPOSITIONS.has(rawDisposition))) {
+  if (rawDisposition !== undefined && rawDisposition !== "" && (typeof rawDisposition !== "string" || !VALID_DISPOSITIONS.has(rawDisposition))) {
     return json({ error: "invalid disposition" }, 400);
   }
-  const disposition = rawDisposition as Disposition | undefined;
+  const disposition = (rawDisposition === "" ? undefined : rawDisposition) as Disposition | undefined;
 
   // Decode photo — Capture is JPEG-only; name carries through to the Drive filename
   let photoBytes: number[];
