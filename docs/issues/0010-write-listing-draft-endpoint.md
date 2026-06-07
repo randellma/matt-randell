@@ -1,7 +1,7 @@
 # "Write Listing draft" endpoint
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: pending-verification
 **Blocked by**: #0007 — Capture an Item end-to-end
 
 ## Parent
@@ -18,9 +18,9 @@ Verifiable on its own by curling a draft for a known Item and confirming the cel
 
 ## Acceptance criteria
 
-- [ ] A `POST` (authenticated by the shared secret) accepts an Item reference plus a price range, rationale, and post template, and writes them to that Item's row
-- [ ] Writing a draft does not disturb the author-facing columns (Name, Disposition, Notes, Handled on)
-- [ ] Unit tests cover ListingDraftMapper (draft → correct cell writes for the target Item)
+- [x] A `POST` (authenticated by the shared secret) accepts an Item reference plus a price range, rationale, and post template, and writes them to that Item's row
+- [x] Writing a draft does not disturb the author-facing columns (Name, Disposition, Notes, Handled on)
+- [x] Unit tests cover ListingDraftMapper (draft → correct cell writes for the target Item)
 - [ ] Verified manually: a curl draft-write updates the intended row's Listing-draft cells
 
 ## Blocked by
