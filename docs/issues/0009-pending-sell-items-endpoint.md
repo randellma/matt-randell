@@ -1,7 +1,7 @@
 # "Pending Sell Items" endpoint
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: done
 **Blocked by**: #0007 — Capture an Item end-to-end
 
 ## Parent
@@ -18,11 +18,11 @@ This is verifiable on its own by marking some rows Sell in the Sheet and curling
 
 ## Acceptance criteria
 
-- [ ] A `GET` (authenticated by the shared secret) returns Sell Items that have no Listing draft, each with name and Drive image URL
-- [ ] Give away and Donate Items, undecided Items, and Sell Items already drafted are excluded from the result
-- [ ] Unit tests cover LifecycleDeriver (empty Disposition → Captured; set Disposition, empty Handled-on → Reviewed; present Handled-on → Handled)
-- [ ] Unit tests cover PendingDraftSelector (returns only un-drafted Sell Items; excludes other Dispositions, undecided, and already-drafted Items)
-- [ ] Verified manually: after marking rows Sell, the endpoint returns exactly those Items lacking a draft
+- [x] A `GET` (authenticated by the shared secret) returns Sell Items that have no Listing draft, each with name and Drive image URL
+- [x] Give away and Donate Items, undecided Items, and Sell Items already drafted are excluded from the result
+- [x] Unit tests cover LifecycleDeriver (empty Disposition → Captured; set Disposition, empty Handled-on → Reviewed; present Handled-on → Handled)
+- [x] Unit tests cover PendingDraftSelector (returns only un-drafted Sell Items; excludes other Dispositions, undecided, and already-drafted Items)
+- [x] Verified manually: after marking rows Sell, the endpoint returns exactly those Items lacking a draft
 
 ## Blocked by
 
