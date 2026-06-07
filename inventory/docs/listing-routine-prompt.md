@@ -59,8 +59,15 @@ For each item:
    postTemplate
      A complete, copy-paste-ready Facebook Marketplace post.
      Include a short title (under 10 words) and a 2–3 sentence description.
-     Mention the visible condition if the photo shows it.
      Do NOT include a price — the owner sets their own before posting.
+
+     Condition rules for the description:
+     - The seller only lists items that work — never hedge with phrases like "appears to work",
+       "seems functional", or "appears fully functional". If you mention function, state it
+       directly; otherwise say nothing about it.
+     - Do not mention surface conditions the seller can clean before listing (dust, dirt,
+       smudges, etc.). Only call out permanent or structural issues (scratches, dents,
+       missing parts, cracked housing, etc.).
 
 3. POST the draft back.
 
