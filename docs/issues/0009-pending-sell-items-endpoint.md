@@ -22,7 +22,7 @@ This is verifiable on its own by marking some rows Sell in the Sheet and curling
 - [x] Give away and Donate Items, undecided Items, and Sell Items already drafted are excluded from the result
 - [x] Unit tests cover LifecycleDeriver (empty Disposition → Captured; set Disposition, empty Handled-on → Reviewed; present Handled-on → Handled)
 - [x] Unit tests cover PendingDraftSelector (returns only un-drafted Sell Items; excludes other Dispositions, undecided, and already-drafted Items)
-- [ ] Verified manually: after marking rows Sell, the endpoint returns exactly those Items lacking a draft
+- [x] Verified manually: after marking rows Sell, the endpoint returns exactly those Items lacking a draft
 
 ## Blocked by
 
