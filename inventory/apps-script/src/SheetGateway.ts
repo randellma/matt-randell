@@ -13,6 +13,7 @@
  */
 
 import type { RowValues } from "./CapturePayloadMapper.js";
+import type { InventoryRow } from "./PendingDraftSelector.js";
 
 /**
  * Appends the row to the Sheet, replacing the null Photo slot with a CellImage.
@@ -46,6 +47,36 @@ export function appendCaptureRow(
   const cellImage = SpreadsheetApp.newCellImage().setSourceUrl(dataUri).build();
   sheet.getRange(lastRow, 2).setValue(cellImage);
   sheet.setRowHeight(lastRow, 300);
+}
+
+/**
+ * Reads all data rows from the Sheet as structured InventoryRow objects.
+ *
+ * Column layout:
+ *   [0] Captured at  [1] Photo  [2] Name  [3] Disposition
+ *   [4] Handled on   [5] Notes  [6] Drive image URL  [7] Listing draft (if present)
+ *
+ * Skips row 1 (header). Returns [] when there are no data rows.
+ */
+export function readInventoryRows(sheetId: string): InventoryRow[] {
+  const sheet = SpreadsheetApp.openById(sheetId).getSheets()[0];
+  if (!sheet) throw new Error("Inventory sheet not found at index 0");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() as unknown[][];
+
+  return values.map(row => ({
+    name: String(row[2] ?? ""),
+    disposition: String(row[3] ?? ""),
+    handledOn: String(row[4] ?? ""),
+    driveImageUrl: String(row[6] ?? ""),
+    hasDraft: row[7] !== undefined && row[7] !== null && String(row[7]).trim() !== "",
+  }));
 }
 
 /**
