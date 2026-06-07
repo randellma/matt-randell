@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.env
+rollup.config-*.mjs
+# clasp credentials live in ~/.clasprc.json — never in the repo
