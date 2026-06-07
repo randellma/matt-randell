@@ -14,6 +14,7 @@
 
 import type { RowValues } from "./CapturePayloadMapper.js";
 import type { InventoryRow } from "./PendingDraftSelector.js";
+import type { DraftValues } from "./ListingDraftMapper.js";
 
 /**
  * Appends the row to the Sheet, replacing the null Photo slot with a CellImage.
@@ -77,6 +78,28 @@ export function readInventoryRows(sheetId: string): InventoryRow[] {
     driveImageUrl: String(row[6] ?? ""),
     hasDraft: row[7] !== undefined && row[7] !== null && String(row[7]).trim() !== "",
   }));
+}
+
+/**
+ * Writes a Listing draft (price range, rationale, post template) into the row whose
+ * Drive image URL (col G) matches itemRef.
+ *
+ * Writes to columns H, I, J (1-indexed: 8, 9, 10). Does not touch cols A–G.
+ * Throws if no matching row is found.
+ */
+export function writeDraftCells(sheetId: string, itemRef: string, values: DraftValues): void {
+  const sheet = SpreadsheetApp.openById(sheetId).getSheets()[0];
+  if (!sheet) throw new Error("Inventory sheet not found at index 0");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("No items found in sheet");
+
+  const driveUrls = sheet.getRange(2, 7, lastRow - 1, 1).getValues() as string[][];
+  const rowIndex = driveUrls.findIndex(r => r[0] === itemRef);
+  if (rowIndex === -1) throw new Error(`No item found with itemRef: ${itemRef}`);
+
+  const sheetRow = rowIndex + 2; // +1 for 1-index, +1 for header
+  sheet.getRange(sheetRow, 8, 1, 3).setValues([[values[0], values[1], values[2]]]);
 }
 
 /**
