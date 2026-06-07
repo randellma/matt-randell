@@ -2,7 +2,8 @@
  * Apps Script web app entry point.
  *
  * Routes:
- *   POST /  → Capture endpoint
+ *   POST /  → Capture endpoint (body has: name, capturedAt, photo)
+ *   POST /  → Write Listing draft (body has: itemRef, priceRange, rationale, postTemplate)
  *   GET  /  → Pending Sell Items (work queue for listing generation)
  *
  * Deploy via Apps Script editor → Deploy → New deployment → Web app.
@@ -16,8 +17,9 @@
 
 import { authenticate } from "./RequestAuthenticator.js";
 import { mapCapturePayload } from "./CapturePayloadMapper.js";
+import { mapListingDraft } from "./ListingDraftMapper.js";
 import { savePhoto } from "./DrivePhotoStore.js";
-import { appendCaptureRow, readInventoryRows } from "./SheetGateway.js";
+import { appendCaptureRow, readInventoryRows, writeDraftCells } from "./SheetGateway.js";
 import { selectPendingDrafts } from "./PendingDraftSelector.js";
 import type { Disposition } from "./CapturePayloadMapper.js";
 
@@ -49,8 +51,34 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
     return json({ error: "unauthorized" }, 401);
   }
 
-  // Guard misconfigured deployment (empty IDs throw uncaught exceptions in Drive/Sheets)
-  if (!sheetId || !folderId) {
+  // Guard sheetId — required by both routes
+  if (!sheetId) {
+    return json({ error: "server misconfigured" }, 500);
+  }
+
+  // Route: Write Listing draft (body has itemRef)
+  if (body["itemRef"] !== undefined) {
+    const itemRef = body["itemRef"];
+    const priceRange = body["priceRange"];
+    const rationale = body["rationale"];
+    const postTemplate = body["postTemplate"];
+
+    if (
+      typeof itemRef !== "string" ||
+      typeof priceRange !== "string" ||
+      typeof rationale !== "string" ||
+      typeof postTemplate !== "string"
+    ) {
+      return json({ error: "missing required fields: itemRef, priceRange, rationale, postTemplate" }, 400);
+    }
+
+    const draftValues = mapListingDraft({ priceRange, rationale, postTemplate });
+    writeDraftCells(sheetId, itemRef, draftValues);
+    return json({ ok: true });
+  }
+
+  // Route: Capture (body has name, capturedAt, photo)
+  if (!folderId) {
     return json({ error: "server misconfigured" }, 500);
   }
 
