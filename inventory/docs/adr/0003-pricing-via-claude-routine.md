@@ -1,0 +1,7 @@
+# Listing generation is a Claude subscription routine, not Apps Script calling the Claude API
+
+Listing drafts (price range, rationale, post template) are produced by a scheduled **Claude routine** running on the owner's Claude subscription, rather than by Apps Script calling the Anthropic API directly from the Sheet. The routine runs once daily to clear the backlog (and can be kicked off on demand): it asks the Apps Script web app for Sell Items that lack a draft (returned with their Drive image URLs), looks at each photo, and POSTs the generated draft back for Apps Script to write into the Sheet. Apps Script remains the single gatekeeper of the Sheet and Drive; the routine only speaks to its endpoints.
+
+The rejected alternative — **(B)** Apps Script calls the Claude API directly, giving an in-Sheet "Generate listing" button — is more reliable and lives in one surface, but it needs a separately-managed Anthropic API key and bills per use instead of using the subscription already paid for. (A) was chosen because zero marginal cost and "use my Claude subscription" was an explicit goal. **(B) is the named fallback** if the routine proves too fiddly to read/write the Sheet reliably.
+
+Pricing starts as an **LLM estimate only** — a range plus a one-line rationale the human can override — not live market-comp research. Most items have an obvious price; deeper web-search comps are a manual, per-item trigger added later only if plain estimates feel off.
