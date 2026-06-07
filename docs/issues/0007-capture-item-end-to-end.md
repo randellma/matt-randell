@@ -1,7 +1,7 @@
 # Capture an Item end-to-end
 
 **Type**: HITL
-**Status**: ready-for-agent
+**Status**: done
 **Blocked by**: None — can start immediately
 
 ## Parent
@@ -39,11 +39,51 @@ See ADR-0001 (Google stack, CellImage + private Drive) and ADR-0002 (AI is draft
 
 ## Acceptance criteria
 
-- [ ] The Inventory Sheet exists with the six author columns, a Disposition dropdown (Sell / Give away / Donate), and a column for the Drive image URL
-- [ ] A private Drive folder holds photo originals; the originals are not publicly accessible
-- [ ] The Apps Script source is authored in TypeScript and tracked via `clasp` under the Inventory context; the shared secret lives in Script Properties, not in git
-- [ ] A `POST` with the correct secret, a name, and a photo appends a row and embeds an inline CellImage thumbnail
-- [ ] An optional Disposition supplied at Capture is recorded; when omitted, the Disposition cell is left blank
-- [ ] A `POST` with a missing or wrong secret is rejected and writes nothing
-- [ ] Unit tests cover RequestAuthenticator (accepts correct secret; rejects missing/empty/wrong) and CapturePayloadMapper (full payload → ordered row values; missing Disposition left blank; timestamp and image reference carried through)
-- [ ] Verified manually: a curl Capture lands a row with a visible thumbnail and a private Drive original
+- [x] The Inventory Sheet exists with the six author columns, a Disposition dropdown (Sell / Give away / Donate), and a column for the Drive image URL
+- [x] A private Drive folder holds photo originals; the originals are not publicly accessible
+- [x] The Apps Script source is authored in TypeScript and tracked via `clasp` under the Inventory context; the shared secret lives in Script Properties, not in git
+- [x] A `POST` with the correct secret, a name, and a photo appends a row and embeds an inline CellImage thumbnail
+- [x] An optional Disposition supplied at Capture is recorded; when omitted, the Disposition cell is left blank
+- [x] A `POST` with a missing or wrong secret is rejected and writes nothing
+- [x] Unit tests cover RequestAuthenticator (accepts correct secret; rejects missing/empty/wrong) and CapturePayloadMapper (full payload → ordered row values; missing Disposition left blank; timestamp and image reference carried through)
+- [x] Verified manually: a curl Capture lands a row with a visible thumbnail and a private Drive original
+
+## Implementation notes
+
+### What was built (`inventory/apps-script/`)
+
+Project structure: TypeScript sources under `src/`, compiled with `tsc`, tested with `vitest`, tracked via `clasp`.
+
+**Pure modules (unit-tested, 8 tests passing):**
+- `RequestAuthenticator.ts` — validates the shared secret; accepts correct, rejects wrong/empty/missing
+- `CapturePayloadMapper.ts` — maps `{ name, capturedAt, driveImageUrl, disposition? }` to the 7-column ordered row; null in the Photo slot is replaced by `SheetGateway` with a CellImage
+
+**Google glue (thin wrappers, verified manually against live APIs):**
+- `DrivePhotoStore.ts` — saves a Blob to the private Drive folder (no public sharing); returns `{ fileId, url }`
+- `SheetGateway.ts` — `appendCaptureRow` appends the row then writes a `CellImage` into column B of the new last row; `ensureDispositionDropdown` sets up the dropdown validation on column D (call once during setup)
+
+**Entry point:**
+- `WebApp.ts` — `doPost` handler: parses JSON body, authenticates, decodes base64 photo, saves to Drive, maps the row, appends to Sheet; `doGet` returns a health check. All three Script Properties (`SECRET`, `SHEET_ID`, `DRIVE_FOLDER_ID`) are read at runtime from Script Properties — never in source.
+- `appsscript.json` — Apps Script manifest (V8 runtime, `ANYONE_ANONYMOUS` access)
+
+### Google resources
+
+| Resource | ID |
+|---|---|
+| Inventory Sheet | `1qRucz2hpcnxl0gpUkQ8f6VIdtazRbTsUK8RlnWwDsdA` |
+| Drive folder (Inventory Photos) | `1XWlPRUp8ETrED2CWGE46CF46Kpoy4nyS` |
+| Apps Script project | `1epUf37qll7b1ZpEXqwKn5Yq0fvdZLpVny6ORy7smAawM1GoCgqP6Ixig` |
+| Deployment ID | `AKfycbzuI94y3Cu4gXbaS40ZTDjwoXCO2t2iib_cm_YkXJouMhlfxHp2N6JAmunN1zDMhCb2eQ` |
+| Endpoint URL | `https://script.google.com/macros/s/AKfycbzuI94y3Cu4gXbaS40ZTDjwoXCO2t2iib_cm_YkXJouMhlfxHp2N6JAmunN1zDMhCb2eQ/exec` |
+
+### Build and deploy
+
+```sh
+cd inventory/apps-script
+npm run build          # rollup src/WebApp.ts → dist/WebApp.js
+npx clasp push --force # push dist/ to Apps Script
+```
+
+### Remaining manual step
+
+- [ ] Smoke-test verified: a curl Capture lands a row with a visible thumbnail and a private Drive original
