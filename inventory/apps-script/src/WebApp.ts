@@ -3,6 +3,7 @@
  *
  * Routes:
  *   POST /  → Capture endpoint
+ *   GET  /  → Pending Sell Items (work queue for listing generation)
  *
  * Deploy via Apps Script editor → Deploy → New deployment → Web app.
  * Set "Execute as: Me" and "Who has access: Anyone" (auth is the shared secret).
@@ -16,7 +17,8 @@
 import { authenticate } from "./RequestAuthenticator.js";
 import { mapCapturePayload } from "./CapturePayloadMapper.js";
 import { savePhoto } from "./DrivePhotoStore.js";
-import { appendCaptureRow } from "./SheetGateway.js";
+import { appendCaptureRow, readInventoryRows } from "./SheetGateway.js";
+import { selectPendingDrafts } from "./PendingDraftSelector.js";
 import type { Disposition } from "./CapturePayloadMapper.js";
 
 const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate", "Junk"]);
@@ -90,8 +92,21 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
   return json({ ok: true });
 }
 
-function doGet(): GoogleAppsScript.Content.TextOutput {
-  return json({ ok: true, service: "inventory" });
+function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextOutput {
+  const props = PropertiesService.getScriptProperties();
+  const secret = props.getProperty("SECRET") ?? "";
+  const sheetId = props.getProperty("SHEET_ID") ?? "";
+
+  if (!authenticate(e.parameter as Record<string, unknown>, secret)) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
+  if (!sheetId) {
+    return json({ error: "server misconfigured" }, 500);
+  }
+
+  const items = selectPendingDrafts(readInventoryRows(sheetId));
+  return json({ items });
 }
 
 // Expose as Apps Script globals (prevents rollup tree-shaking)
