@@ -1,0 +1,27 @@
+{
+  "name": "apps-script",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c rollup.config.ts --configPlugin typescript && cp src/appsscript.json dist/appsscript.json",
+    "push": "npm run build && clasp push --force && clasp deploy --deploymentId AKfycbyjJnL9Rv3qyyy_aV2-nrAtICndug41fE-ZCkZEU205fftVSaWIOW_VrOfpdWJFTwH-EQ --description \"deploy\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@google/clasp": "^3.3.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/google-apps-script": "^2.0.11",
+    "rollup": "^4.61.1",
+    "rollup-plugin-cleanup": "^3.2.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
