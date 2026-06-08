@@ -122,6 +122,94 @@
     }
     #status.error { color: #fca5a5; }
     #status.success { color: #86efac; }
+
+    /* ── Tab nav ── */
+    #tab-nav {
+      display: none;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1.25rem 1.5rem 0;
+      max-width: 30rem;
+      margin: 0 auto;
+    }
+    .tab {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 0.5rem;
+      background: transparent;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tab:hover { background: rgba(255,255,255,0.1); }
+    .tab.active { background: white; color: var(--blue); border-color: white; }
+
+    /* ── Viewer screen ── */
+    #viewer {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      padding: 1.25rem 1.5rem 2rem;
+      max-width: 30rem;
+      margin: 0 auto;
+    }
+    #viewer-status {
+      font-size: 0.875rem;
+      opacity: 0.75;
+      text-align: center;
+      padding: 1rem 0;
+    }
+    #item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .item-card {
+      display: flex;
+      gap: 0.75rem;
+      background: rgba(255,255,255,0.12);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      align-items: flex-start;
+    }
+    .item-thumb {
+      width: 4rem;
+      height: 4rem;
+      object-fit: cover;
+      border-radius: 0.5rem;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.1);
+    }
+    .item-thumb-placeholder {
+      width: 4rem;
+      height: 4rem;
+      border-radius: 0.5rem;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    .item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+    .item-name { font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-captured { background: rgba(255,255,255,0.2); color: white; }
+    .badge-reviewed { background: #fbbf24; color: #1f2937; }
+    .badge-handled  { background: #34d399; color: #1f2937; }
+    .item-disposition { font-size: 0.8rem; opacity: 0.8; }
+    .item-notes { font-size: 0.8rem; opacity: 0.7; font-style: italic; margin-top: 0.15rem; }
   </style>
 </head>
 <body>
@@ -132,6 +220,12 @@
     <p>Enter the shared secret to get started.<br>It will be remembered on this device.</p>
     <input id="secret-input" type="password" placeholder="Shared secret" autocomplete="off" />
     <button class="btn btn-primary" id="secret-save">Save</button>
+  </div>
+
+  <!-- Tab nav — shown once secret is entered -->
+  <div id="tab-nav">
+    <button class="tab active" id="tab-capture">Capture</button>
+    <button class="tab" id="tab-viewer">Viewer</button>
   </div>
 
   <!-- Capture screen — shown once secret is in localStorage -->
@@ -163,6 +257,12 @@
 
     <button class="btn btn-primary" id="capture-btn">Capture</button>
     <div id="status"></div>
+  </div>
+
+  <!-- Viewer screen -->
+  <div id="viewer">
+    <div id="viewer-status"></div>
+    <div id="item-list"></div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>
