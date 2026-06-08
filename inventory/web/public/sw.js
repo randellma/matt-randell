@@ -1,4 +1,4 @@
-const CACHE = 'inventory-shell-v3';
+const CACHE = 'inventory-shell-v4';
 const SHELL = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.mode === 'navigate') {
-    e.respondWith(caches.match('/').then(r => r || fetch(e.request)));
+    e.respondWith(fetch(e.request).catch(() => caches.match('/')));
     return;
   }
   e.respondWith(
