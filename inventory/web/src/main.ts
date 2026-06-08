@@ -1,5 +1,6 @@
 import { LocalStorageSecretStore } from './SecretStore';
 import { AppsScriptStore } from './AppsScriptStore';
+import { getSecretFromUrl } from './getSecretFromUrl';
 import type { Disposition, Item } from './InventoryStore';
 
 const ENDPOINT_URL =
@@ -101,7 +102,11 @@ async function loadItems() {
   }
 }
 
-if (secretStore.get()) {
+const urlSecret = getSecretFromUrl(window.location.search);
+if (urlSecret) {
+  secretStore.set(urlSecret);
+  showCapture();
+} else if (secretStore.get()) {
   showCapture();
 } else {
   showGate();
