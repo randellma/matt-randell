@@ -1,4 +1,4 @@
-const CACHE = 'inventory-shell-v2';
+const CACHE = 'inventory-shell-v3';
 const SHELL = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
