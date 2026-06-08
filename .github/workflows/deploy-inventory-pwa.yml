@@ -1,0 +1,23 @@
+name: Deploy Inventory PWA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - inventory/web/**
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          accountId: 894ff489298bdf1ca445fc9469854b25
+          projectName: inventory-mattrandell
+          directory: inventory/web
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
