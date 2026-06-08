@@ -1,8 +1,7 @@
 # Retire the Cloud DNS zone
 
 **Type**: AFK
-**Status**: ready-for-agent
-**Blocked by**: #0012 — Onboard existing Cloudflare infra into Terraform
+**Status**: closed
 
 ## Parent
 
@@ -16,11 +15,8 @@ This reverses the output of issue 0003 (which created the Cloud DNS zone and Git
 
 ## Acceptance criteria
 
-- [ ] Confirmed the registrar's nameservers point at Cloudflare and the Cloud DNS zone serves no live traffic before destroying it
-- [ ] `terraform/dns.tf` is removed (managed zone, all record sets, `nameservers` output)
-- [ ] The `dns.googleapis.com` enable is removed from `terraform/apis.tf`
-- [ ] `terraform apply` destroys the Cloud DNS zone with no impact on resolution of `mattrandell.com` or its subdomains
+- [x] Confirmed the registrar's nameservers point at Cloudflare and the Cloud DNS zone serves no live traffic before destroying it
+- [x] `terraform/dns.tf` is removed (managed zone, all record sets, `nameservers` output)
+- [x] The `dns.googleapis.com` enable is removed from `terraform/apis.tf`
+- [x] `terraform apply` destroys the Cloud DNS zone with no impact on resolution of `mattrandell.com` or its subdomains
 
-## Blocked by
-
-- #0012 — needs Cloudflare records adopted into Terraform first
