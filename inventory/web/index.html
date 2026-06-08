@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563EB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Inventory" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Inventory</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #2563EB;
+      color: white;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+    h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+    p { font-size: 1rem; opacity: 0.7; }
+  </style>
+</head>
+<body>
+  <h1>Inventory</h1>
+  <p>Coming soon</p>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>

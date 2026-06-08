@@ -1,9 +1,11 @@
 import { deriveLifecycle } from "./LifecycleDeriver.js";
 
 export interface InventoryRow {
+  capturedAt: string;
   name: string;
   disposition: string;
   handledOn: string;
+  notes: string;
   driveImageUrl: string;
   hasDraft: boolean;
 }

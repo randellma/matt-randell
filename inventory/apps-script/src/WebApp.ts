@@ -21,6 +21,8 @@ import { mapListingDraft } from "./ListingDraftMapper.js";
 import { savePhoto } from "./DrivePhotoStore.js";
 import { appendCaptureRow, readInventoryRows, writeDraftCells } from "./SheetGateway.js";
 import { selectPendingDrafts } from "./PendingDraftSelector.js";
+import { selectAllItems } from "./AllItemsMapper.js";
+import { fetchDriveThumbnail } from "./DriveThumbnailFetcher.js";
 import type { Disposition } from "./CapturePayloadMapper.js";
 
 const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate", "Junk"]);
@@ -131,6 +133,22 @@ function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextO
 
   if (!sheetId) {
     return json({ error: "server misconfigured" }, 500);
+  }
+
+  const params = e.parameter as Record<string, string>;
+  if (params["all"] === "1") {
+    const withThumbnails = params["thumbnails"] === "1";
+    const rows = readInventoryRows(sheetId);
+    const items = selectAllItems(rows).map(item => ({
+      name: item.name,
+      lifecycle: item.lifecycle,
+      disposition: item.disposition,
+      notes: item.notes,
+      capturedAt: item.capturedAt,
+      handledOn: item.handledOn,
+      ...(withThumbnails && { thumbnail: fetchDriveThumbnail(item.driveImageUrl) }),
+    }));
+    return json({ items });
   }
 
   const items = selectPendingDrafts(readInventoryRows(sheetId));
