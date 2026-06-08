@@ -1,5 +1,7 @@
 # Inventory runs on the Google stack, not GCP
 
+> **Amended by [ADR-0004](0004-hosted-capture-and-viewer-pwa.md):** the "no hosting needed at all / the Sheet is the viewer" conclusion below was later revised — capture and a read-only viewer moved to a hosted PWA. The backend half of this ADR (Apps Script + Sheet + private Drive, no server) still stands.
+
 Inventory is built entirely on Google Apps Script, a Google Sheet, and Google Drive — even though the rest of this repo runs on GCP (Cloud Domains, Cloud DNS) managed by Terraform. Capture is an iOS Shortcut POSTing to an Apps Script web app, which saves the photo to a **private** Drive folder, embeds an inline thumbnail in the Sheet via the Apps Script `CellImage` API, and appends a row. The Sheet itself is the review surface.
 
 The GCP alternative (GCS bucket + Cloud Function + Firestore) was rejected: it's a server and auth layer to maintain for a near-trivial personal tool, and the goal was explicitly "barely an app." The Sheet doubles as the viewer, so no hosting is needed at all.

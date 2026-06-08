@@ -1,6 +1,6 @@
 # Matt Randell Personal Site
 
-A monorepo managing both the static website content and the GCP infrastructure (domain registration, DNS) for `mattrandell.com`.
+A monorepo managing both the static website content and the cloud infrastructure (GCP domain registration; Cloudflare DNS, tunnels, and static hosting) for `mattrandell.com`.
 
 ## Language
 
@@ -9,7 +9,7 @@ The static website served at `mattrandell.com` via GitHub Pages; source files li
 _Avoid_: App, application, page, project
 
 **Infrastructure**:
-The GCP resources (Cloud Domains registration, Cloud DNS zone) managed by Terraform; configuration lives in `/terraform`.
+The cloud resources managed by Terraform — domain registration in GCP Cloud Domains, plus DNS, tunnels, and static hosting on Cloudflare; configuration lives in `/terraform`. Registrar (GCP) and DNS authority (Cloudflare) are deliberately split — see `docs/adr/0003`.
 _Avoid_: Backend, config, cloud
 
 **Bootstrap**:
@@ -19,7 +19,7 @@ _Avoid_: Init, setup
 ## Relationships
 
 - The **Site** is built from source in `/site` and deployed to GitHub Pages via GitHub Actions
-- The **Infrastructure** manages the domain registration and DNS records that route `mattrandell.com` to GitHub Pages
+- The **Infrastructure** manages the domain registration (GCP) and the Cloudflare DNS records that route `mattrandell.com` to GitHub Pages and the subdomains to their hosts
 - **Bootstrap** is a prerequisite to managing any **Infrastructure** with Terraform
 
 ## Example dialogue

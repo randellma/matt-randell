@@ -9,7 +9,7 @@ This repo holds more than one domain. Each context has its own glossary.
 
 ## Relationships
 
-- **Inventory → Site & Infrastructure**: Currently independent — Inventory lives entirely in Google (Apps Script, Sheet, Drive) and touches no Infrastructure. *If* a hosted viewer is ever built, it would sit under a subdomain (`inventory.mattrandell.com`) whose DNS the Infrastructure would then manage.
+- **Inventory → Site & Infrastructure**: Inventory's store still lives entirely in Google (Apps Script, Sheet, Drive), but its capture client and read-only viewer are now a hosted PWA at `inventory.mattrandell.com` (Cloudflare Pages, with the subdomain a Cloudflare DNS record — both managed by the Infrastructure's Terraform). See [inventory/docs/adr/0004](./inventory/docs/adr/0004-hosted-capture-and-viewer-pwa.md).
 
 ## System-wide decisions
 
