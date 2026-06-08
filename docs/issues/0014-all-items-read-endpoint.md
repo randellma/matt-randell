@@ -1,7 +1,7 @@
 # "All Items" read endpoint with thumbnails
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: closed
 **Blocked by**: None — can start immediately
 
 ## Parent
@@ -18,11 +18,11 @@ Note: thumbnails are returned inline for now; if the list grows large, lazy/pagi
 
 ## Acceptance criteria
 
-- [ ] An authenticated `GET` returns all Items with name, derived lifecycle, Disposition, notes, captured-at, and handled-on
-- [ ] Each Item includes a small base64 thumbnail; no publicly-fetchable photo URL is exposed
-- [ ] Items of every Disposition (Sell / Give away / Donate / Junk) and every lifecycle state are included — it is the full list, not the pending-Sell queue
-- [ ] Unit tests cover the all-items selector/mapper (row → item shape; lifecycle derived correctly)
-- [ ] Verified manually: a browser fetch (secret as query param) returns readable JSON with rendering-ready thumbnails
+- [x] An authenticated `GET` returns all Items with name, derived lifecycle, Disposition, notes, captured-at, and handled-on
+- [x] Each Item includes a small base64 thumbnail; no publicly-fetchable photo URL is exposed
+- [x] Items of every Disposition (Sell / Give away / Donate / Junk) and every lifecycle state are included — it is the full list, not the pending-Sell queue
+- [x] Unit tests cover the all-items selector/mapper (row → item shape; lifecycle derived correctly)
+- [x] Verified manually: a browser fetch (secret as query param) returns readable JSON with rendering-ready thumbnails
 
 ## Blocked by
 

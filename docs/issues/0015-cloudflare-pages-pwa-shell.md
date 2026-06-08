@@ -1,7 +1,7 @@
 # Cloudflare Pages shell at inventory.mattrandell.com
 
 **Type**: HITL
-**Status**: pending-manual-verification
+**Status**: closed
 **Blocked by**: ~~#0012 — Onboard existing Cloudflare infra into Terraform~~ (done)
 
 ## Parent
@@ -14,11 +14,11 @@ The walking skeleton for the hosted PWA — proving hosting, DNS, deploy, and in
 
 ## Acceptance criteria
 
-- [ ] The Cloudflare Pages project and the `inventory.mattrandell.com` DNS record are managed in Terraform
-- [ ] A GitHub Actions workflow builds and deploys the PWA on push to `main`
-- [ ] `https://inventory.mattrandell.com` loads the shell over valid HTTPS
-- [ ] The app is installable (manifest + icons + service-worker app shell); "Add to Home Screen" on iOS yields a full-screen, chrome-less app
-- [ ] The PWA source lives in the monorepo (e.g. `inventory/web/`)
+- [x] The Cloudflare Pages project and the `inventory.mattrandell.com` DNS record are managed in Terraform
+- [x] A GitHub Actions workflow builds and deploys the PWA on push to `main`
+- [x] `https://inventory.mattrandell.com` loads the shell over valid HTTPS
+- [x] The app is installable (manifest + icons + service-worker app shell); "Add to Home Screen" on iOS yields a full-screen, chrome-less app
+- [x] The PWA source lives in the monorepo (e.g. `inventory/web/`)
 
 ## What was done (AFK)
 
