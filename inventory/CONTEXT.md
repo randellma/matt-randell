@@ -13,12 +13,13 @@ The act of recording an Item while walking around — a photo, a name, and optio
 _Avoid_: Add, create, log
 
 **Disposition**:
-The decision about how an Item leaves the house. One of **Sell**, **Give away**, or **Donate**. May be set at Capture time if known, otherwise assigned at Review.
+The decision about how an Item leaves the house. One of **Sell**, **Give away**, **Donate**, or **Junk**. May be set at Capture time if known, otherwise assigned at Review.
 _Avoid_: Category, type, action, outcome
 
 - **Sell**: Listed for money (e.g. Facebook Marketplace). The only Disposition the AI experimentation ever touches.
 - **Give away**: Handed to a specific recipient for free, via a Facebook Buy Nothing group.
 - **Donate**: Dropped at a local thrift shop. No specific recipient.
+- **Junk**: Thrown away — binned, recycled, or taken to the dump. Leaves the house as waste; no recipient, no money.
 
 **Review**:
 Matt and his wife looking at Captured Items and assigning each a Disposition (and any notes).
@@ -34,7 +35,7 @@ An Item moves through three states:
 
 - **Captured** — photo + name recorded. May already have a Disposition, but no decision is required yet.
 - **Reviewed** — a Disposition has been assigned.
-- **Handled** — the Item has left the house (sold / given / donated) and drops off the active list.
+- **Handled** — the Item has left the house (sold / given / donated / junked) and drops off the active list.
 
 ## Relationships
 
@@ -49,3 +50,4 @@ An Item moves through three states:
 ## Flagged ambiguities
 
 - "Give away" vs "Donate" are deliberately separate Dispositions: **Give away** is a free handoff to a known recipient via a Buy Nothing group; **Donate** is dropped at a thrift shop with no recipient.
+- "Donate" vs "Junk" are distinct: **Donate** is a still-usable Item given to a thrift shop; **Junk** is thrown away as waste (bin / recycling / dump) because it has no further value.
