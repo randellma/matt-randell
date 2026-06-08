@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppsScriptStore } from './AppsScriptStore';
 import type { SecretStore } from './SecretStore';
-import type { CaptureInput } from './InventoryStore';
+import type { CaptureInput, Item } from './InventoryStore';
 
 const ENDPOINT = 'https://script.google.com/macros/s/test-id/exec';
 
@@ -92,5 +92,75 @@ describe('AppsScriptStore', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(errorResponse('unauthorized')));
     const store = new AppsScriptStore(ENDPOINT, makeSecretStore('wrong'));
     await expect(store.capture(makeInput())).rejects.toThrow('unauthorized');
+  });
+});
+
+function itemsResponse(items: Item[]) {
+  return new Response(JSON.stringify({ status: 200, items }), { status: 200 });
+}
+
+function makeItem(overrides: Partial<Item> = {}): Item {
+  return {
+    name: 'Blender',
+    lifecycle: 'Reviewed',
+    disposition: 'Sell',
+    notes: '',
+    capturedAt: '2026-06-01T10:00:00Z',
+    handledOn: '',
+    thumbnail: 'base64abc',
+    ...overrides,
+  };
+}
+
+describe('AppsScriptStore.fetchAllItems', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(itemsResponse([])));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('makes a GET request', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    await store.fetchAllItems();
+    const [, options] = vi.mocked(fetch).mock.calls[0];
+    expect((options as RequestInit | undefined)?.method ?? 'GET').toBe('GET');
+  });
+
+  it('sends the request to the endpoint URL', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    await store.fetchAllItems();
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain(ENDPOINT);
+  });
+
+  it('includes the secret in the query string', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('super-secret'));
+    await store.fetchAllItems();
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain('secret=super-secret');
+  });
+
+  it('includes all=1 and thumbnails=1 in the query string', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    await store.fetchAllItems();
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain('all=1');
+    expect(String(url)).toContain('thumbnails=1');
+  });
+
+  it('returns mapped items from the response', async () => {
+    const item = makeItem();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(itemsResponse([item])));
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    const result = await store.fetchAllItems();
+    expect(result).toEqual([item]);
+  });
+
+  it('rejects with the server error message on failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(errorResponse('unauthorized')));
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('wrong'));
+    await expect(store.fetchAllItems()).rejects.toThrow('unauthorized');
   });
 });

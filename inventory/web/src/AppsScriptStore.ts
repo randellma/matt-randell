@@ -1,5 +1,5 @@
 import type { SecretStore } from './SecretStore';
-import type { CaptureInput, InventoryStore } from './InventoryStore';
+import type { CaptureInput, InventoryStore, Item } from './InventoryStore';
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,6 +18,17 @@ export class AppsScriptStore implements InventoryStore {
     private readonly endpointUrl: string,
     private readonly secretStore: SecretStore,
   ) {}
+
+  async fetchAllItems(): Promise<Item[]> {
+    const secret = encodeURIComponent(this.secretStore.get() ?? '');
+    const url = `${this.endpointUrl}?secret=${secret}&all=1&thumbnails=1`;
+    const res = await fetch(url);
+    const data = await res.json() as { ok?: boolean; error?: string; items?: Item[] };
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    return data.items ?? [];
+  }
 
   async capture(input: CaptureInput): Promise<void> {
     const photo = await blobToBase64(input.photo);
