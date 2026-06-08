@@ -2,7 +2,7 @@
 
 **Type**: HITL
 **Status**: ready-for-human
-**Blocked by**: #0015 — Cloudflare Pages shell at inventory.mattrandell.com
+**Blocked by**: manual verification on phone
 
 ## Parent
 
@@ -16,13 +16,15 @@ Use the **current** `/exec` deployment URL, and going forward always update the 
 
 ## Acceptance criteria
 
-- [ ] First load prompts for the shared secret once; it is stored in `localStorage` and sent on every request; no secret is present in the shipped JS
-- [ ] Capture screen offers photo + name + optional Disposition (Sell / Give away / Donate / Junk)
+- [x] First load prompts for the shared secret once; it is stored in `localStorage` and sent on every request; no secret is present in the shipped JS
+- [x] Capture screen offers photo + name + optional Disposition (Sell / Give away / Donate / Junk)
 - [ ] Capturing from a phone lands an Item in the Sheet with a thumbnail; a chosen Disposition is recorded, skipping leaves it blank
-- [ ] Requests go through an `InventoryStore` → `AppsScriptStore` abstraction (storage swappable without touching the UI)
-- [ ] POSTs use `text/plain` and the current `/exec` URL, and work cross-origin from `inventory.mattrandell.com`
+- [x] Requests go through an `InventoryStore` → `AppsScriptStore` abstraction (storage swappable without touching the UI)
+- [x] POSTs use `text/plain` and the current `/exec` URL, and work cross-origin from `inventory.mattrandell.com`
 - [ ] The shared secret is rotated; the iOS Shortcut is retired on both phones once PWA capture is confirmed working
 
 ## Blocked by
 
-- #0015 — needs the deployed, installable PWA shell
+- Manual verification: capture a real item from a phone and confirm it lands in the Sheet with thumbnail
+- Manual step: rotate the shared secret in Apps Script Script Properties, re-enter on each device
+- Manual step: retire the iOS Shortcut on both phones once capture is confirmed working
