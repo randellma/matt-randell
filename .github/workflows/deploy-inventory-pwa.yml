@@ -14,10 +14,24 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: inventory/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: inventory/web
+      - name: Test
+        run: npm test
+        working-directory: inventory/web
+      - name: Build
+        run: npm run build
+        working-directory: inventory/web
       - uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
           accountId: 894ff489298bdf1ca445fc9469854b25
           projectName: inventory-mattrandell
-          directory: inventory/web
+          directory: inventory/web/dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

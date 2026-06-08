@@ -12,28 +12,159 @@
   <title>Inventory</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #2563EB;
+      --blue-dark: #1d4ed8;
+      --red: #dc2626;
+    }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background: #2563EB;
+      background: var(--blue);
       color: white;
       min-height: 100dvh;
+    }
+
+    /* ── Secret gate ── */
+    #gate {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 1rem;
+      min-height: 100dvh;
+      padding: 2rem;
     }
-    h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
-    p { font-size: 1rem; opacity: 0.7; }
+    #gate h1 { font-size: 1.75rem; font-weight: 700; }
+    #gate p { opacity: 0.75; text-align: center; }
+    #gate input {
+      width: 100%;
+      max-width: 22rem;
+      padding: 0.75rem 1rem;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 0.5rem;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 1rem;
+    }
+    #gate input::placeholder { color: rgba(255,255,255,0.5); }
+    #gate input:focus { outline: none; border-color: white; }
+
+    /* ── Capture screen ── */
+    #capture {
+      display: none;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 2rem 1.5rem;
+      max-width: 30rem;
+      margin: 0 auto;
+    }
+    #capture h1 { font-size: 1.5rem; font-weight: 700; }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+    label { font-size: 0.875rem; opacity: 0.8; font-weight: 500; }
+
+    input[type="text"], select {
+      padding: 0.75rem 1rem;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-radius: 0.5rem;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 1rem;
+    }
+    input[type="text"]::placeholder { color: rgba(255,255,255,0.45); }
+    input[type="text"]:focus, select:focus { outline: none; border-color: white; }
+    select option { background: var(--blue-dark); color: white; }
+
+    /* Photo preview */
+    #photo-preview {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      border-radius: 0.75rem;
+      border: 2px dashed rgba(255,255,255,0.4);
+      display: none;
+    }
+    #photo-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      aspect-ratio: 4/3;
+      border: 2px dashed rgba(255,255,255,0.4);
+      border-radius: 0.75rem;
+      cursor: pointer;
+      font-size: 1rem;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+    #photo-label:hover { opacity: 1; }
+    #photo-input { display: none; }
+
+    /* Buttons */
+    .btn {
+      padding: 0.875rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: white; color: var(--blue); }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+
+    #status {
+      font-size: 0.875rem;
+      min-height: 1.25rem;
+      text-align: center;
+    }
+    #status.error { color: #fca5a5; }
+    #status.success { color: #86efac; }
   </style>
 </head>
 <body>
-  <h1>Inventory</h1>
-  <p>Coming soon</p>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js');
-    }
-  </script>
+
+  <!-- Secret gate — shown on first load until secret is entered -->
+  <div id="gate">
+    <h1>Inventory</h1>
+    <p>Enter the shared secret to get started.<br>It will be remembered on this device.</p>
+    <input id="secret-input" type="password" placeholder="Shared secret" autocomplete="off" />
+    <button class="btn btn-primary" id="secret-save">Save</button>
+  </div>
+
+  <!-- Capture screen — shown once secret is in localStorage -->
+  <div id="capture">
+    <h1>Capture</h1>
+
+    <div class="field">
+      <label for="photo-input">Photo</label>
+      <label id="photo-label" for="photo-input">📷 Take or pick a photo</label>
+      <input id="photo-input" type="file" accept="image/*" capture="environment" />
+      <img id="photo-preview" alt="preview" />
+    </div>
+
+    <div class="field">
+      <label for="name-input">Name</label>
+      <input id="name-input" type="text" placeholder="e.g. Old blender" />
+    </div>
+
+    <div class="field">
+      <label for="disposition-select">Disposition (optional)</label>
+      <select id="disposition-select">
+        <option value="">— not sure yet —</option>
+        <option value="Sell">Sell</option>
+        <option value="Give away">Give away</option>
+        <option value="Donate">Donate</option>
+        <option value="Junk">Junk</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" id="capture-btn">Capture</button>
+    <div id="status"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
