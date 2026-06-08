@@ -1,7 +1,7 @@
 # The Claude listing routine
 
 **Type**: HITL
-**Status**: ready-for-agent
+**Status**: closed
 **Blocked by**: #0009 — Pending Sell Items endpoint; #0010 — Write Listing draft endpoint
 
 ## Parent
@@ -18,11 +18,11 @@ _HITL: the routine lives in the owner's Claude subscription (schedule, prompt, o
 
 ## Acceptance criteria
 
-- [ ] A Claude routine runs on the owner's subscription on a daily schedule and can also be triggered on demand
-- [ ] Each run pulls pending Sell Items, looks at each photo, and writes back a price range, a one-line rationale, and a post template
-- [ ] Pricing is an LLM estimate (range + rationale); no web-search comps and no autonomous Facebook interaction
-- [ ] Items captured during the day have Listing drafts by the next morning's run
-- [ ] Verified manually: a run clears the backlog of un-drafted Sell Items, and a spot-check of a few generated prices is sane
+- [x] A Claude routine runs on the owner's subscription on a daily schedule and can also be triggered on demand
+- [x] Each run pulls pending Sell Items, looks at each photo, and writes back a price range, a one-line rationale, and a post template
+- [x] Pricing is an LLM estimate (range + rationale); no web-search comps and no autonomous Facebook interaction
+- [x] Items captured during the day have Listing drafts by the next morning's run
+- [x] Verified manually: a run clears the backlog of un-drafted Sell Items, and a spot-check of a few generated prices is sane
 
 ## Blocked by
 
