@@ -72,9 +72,11 @@ export function readInventoryRows(sheetId: string): InventoryRow[] {
   const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() as unknown[][];
 
   return values.map(row => ({
+    capturedAt: String(row[0] ?? ""),
     name: String(row[2] ?? ""),
     disposition: String(row[3] ?? ""),
     handledOn: String(row[4] ?? ""),
+    notes: String(row[5] ?? ""),
     driveImageUrl: String(row[6] ?? ""),
     hasDraft: row[7] !== undefined && row[7] !== null && String(row[7]).trim() !== "",
   }));
