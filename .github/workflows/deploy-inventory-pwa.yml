@@ -35,3 +35,4 @@ jobs:
           projectName: inventory-mattrandell
           directory: inventory/web/dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
