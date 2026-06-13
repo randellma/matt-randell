@@ -19,7 +19,7 @@ import { authenticate } from "./RequestAuthenticator.js";
 import { mapCapturePayload } from "./CapturePayloadMapper.js";
 import { mapListingDraft } from "./ListingDraftMapper.js";
 import { savePhoto } from "./DrivePhotoStore.js";
-import { appendCaptureRow, readInventoryRows, writeDraftCells } from "./SheetGateway.js";
+import { appendCaptureRow, readInventoryRows, writeDraftCells, setDisposition, markHandled, deleteItem } from "./SheetGateway.js";
 import { selectPendingDrafts } from "./PendingDraftSelector.js";
 import { selectAllItems } from "./AllItemsMapper.js";
 import { fetchDriveThumbnail } from "./DriveThumbnailFetcher.js";
@@ -56,6 +56,32 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
   // Guard sheetId — required by both routes
   if (!sheetId) {
     return json({ error: "server misconfigured" }, 500);
+  }
+
+  // Route: Item mutation (body has action)
+  if (typeof body["action"] === "string") {
+    const action = body["action"];
+    const capturedAt = body["capturedAt"];
+    if (typeof capturedAt !== "string" || !capturedAt) {
+      return json({ error: "capturedAt required" }, 400);
+    }
+    if (action === "setDisposition") {
+      const disposition = body["disposition"];
+      if (disposition !== "" && (typeof disposition !== "string" || !VALID_DISPOSITIONS.has(disposition as string))) {
+        return json({ error: "invalid disposition" }, 400);
+      }
+      setDisposition(sheetId, capturedAt, typeof disposition === "string" ? disposition : "");
+      return json({ ok: true });
+    }
+    if (action === "markHandled") {
+      markHandled(sheetId, capturedAt);
+      return json({ ok: true });
+    }
+    if (action === "deleteItem") {
+      deleteItem(sheetId, capturedAt);
+      return json({ ok: true });
+    }
+    return json({ error: "unknown action" }, 400);
   }
 
   // Route: Write Listing draft (body has itemRef)

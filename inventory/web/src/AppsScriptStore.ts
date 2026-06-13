@@ -1,5 +1,5 @@
 import type { SecretStore } from './SecretStore';
-import type { CaptureInput, InventoryStore, Item } from './InventoryStore';
+import type { CaptureInput, Disposition, InventoryStore, Item } from './InventoryStore';
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -29,6 +29,29 @@ export class AppsScriptStore implements InventoryStore {
       throw new Error(data.error);
     }
     return data.items ?? [];
+  }
+
+  private async mutate(payload: Record<string, string>): Promise<void> {
+    const body = { secret: this.secretStore.get() ?? '', ...payload };
+    const res = await fetch(this.endpointUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json() as { ok?: boolean; error?: string };
+    if (!data.ok) throw new Error(data.error ?? 'request failed');
+  }
+
+  async setDisposition(capturedAt: string, disposition: Disposition | ''): Promise<void> {
+    await this.mutate({ action: 'setDisposition', capturedAt, disposition });
+  }
+
+  async markHandled(capturedAt: string): Promise<void> {
+    await this.mutate({ action: 'markHandled', capturedAt });
+  }
+
+  async deleteItem(capturedAt: string): Promise<void> {
+    await this.mutate({ action: 'deleteItem', capturedAt });
   }
 
   async capture(input: CaptureInput): Promise<void> {

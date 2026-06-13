@@ -104,6 +104,48 @@ export function writeDraftCells(sheetId: string, itemRef: string, values: DraftV
   sheet.getRange(sheetRow, 8, 1, 3).setValues([[values[0], values[1], values[2]]]);
 }
 
+export function setDisposition(sheetId: string, capturedAt: string, disposition: string): void {
+  const sheet = SpreadsheetApp.openById(sheetId).getSheets()[0];
+  if (!sheet) throw new Error("Inventory sheet not found at index 0");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  const keys = sheet.getRange(2, 1, lastRow - 1, 1).getValues() as string[][];
+  const rowIndex = keys.findIndex(r => r[0] === capturedAt);
+  if (rowIndex === -1) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  sheet.getRange(rowIndex + 2, 4).setValue(disposition);
+}
+
+export function markHandled(sheetId: string, capturedAt: string): void {
+  const sheet = SpreadsheetApp.openById(sheetId).getSheets()[0];
+  if (!sheet) throw new Error("Inventory sheet not found at index 0");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  const keys = sheet.getRange(2, 1, lastRow - 1, 1).getValues() as string[][];
+  const rowIndex = keys.findIndex(r => r[0] === capturedAt);
+  if (rowIndex === -1) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  sheet.getRange(rowIndex + 2, 5).setValue(new Date().toISOString());
+}
+
+export function deleteItem(sheetId: string, capturedAt: string): void {
+  const sheet = SpreadsheetApp.openById(sheetId).getSheets()[0];
+  if (!sheet) throw new Error("Inventory sheet not found at index 0");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  const rows = sheet.getRange(2, 1, lastRow - 1, 7).getValues() as string[][];
+  const rowIndex = rows.findIndex(r => r[0] === capturedAt);
+  if (rowIndex === -1) throw new Error(`No item found with capturedAt: ${capturedAt}`);
+  const driveImageUrl = rows[rowIndex][6];
+  if (driveImageUrl) {
+    try {
+      const match = driveImageUrl.match(/\/d\/([^/]+)/);
+      if (match) DriveApp.getFileById(match[1]).setTrashed(true);
+    } catch {
+      // Drive file already gone or inaccessible — continue to delete the row
+    }
+  }
+  sheet.deleteRow(rowIndex + 2);
+}
+
 /**
  * Writes a Disposition dropdown validation to column D if not already present.
  * Call this once during setup, not on every Capture.

@@ -272,6 +272,44 @@
     .badge-handled  { background: #34d399; color: #1f2937; }
     .item-disposition { font-size: 0.8rem; opacity: 0.8; }
     .item-notes { font-size: 0.8rem; opacity: 0.7; font-style: italic; margin-top: 0.15rem; }
+    .item-card { cursor: pointer; transition: background 0.15s; }
+    .item-card:hover { background: rgba(255,255,255,0.18); }
+
+    /* ── Item detail modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay[hidden] { display: none; }
+    .modal-card {
+      position: relative; width: 100%; max-width: 30rem;
+      background: #1e3a8a; border-radius: 1rem 1rem 0 0;
+      padding: 1.5rem 1.25rem 2.5rem;
+      display: flex; flex-direction: column; gap: 0.75rem;
+      max-height: 92dvh; overflow-y: auto;
+    }
+    .modal-close { position: absolute; top: 0.75rem; right: 0.75rem; font-size: 1.1rem; }
+    .modal-img { width: 100%; aspect-ratio: 4/3; object-fit: contain; border-radius: 0.75rem; background: rgba(255,255,255,0.08); }
+    .modal-body { display: flex; flex-direction: column; gap: 0.6rem; }
+    .modal-name { font-weight: 700; font-size: 1.1rem; }
+    .modal-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .modal-notes { font-size: 0.85rem; opacity: 0.75; font-style: italic; }
+    .modal-section { display: flex; flex-direction: column; gap: 0.35rem; }
+    .modal-label { font-size: 0.8rem; opacity: 0.7; font-weight: 500; }
+    .modal-select {
+      padding: 0.65rem 0.9rem; border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 0.5rem; background: rgba(255,255,255,0.12);
+      color: white; font-size: 0.95rem; width: 100%;
+    }
+    .modal-select option { background: #1d4ed8; color: white; }
+    .modal-action-btn { width: 100%; margin-top: 0.25rem; }
+    .btn-secondary { background: rgba(255,255,255,0.18); color: white; }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.25); }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-danger:hover:not(:disabled) { opacity: 0.85; }
+    .modal-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .modal-error { font-size: 0.85rem; color: #fca5a5; text-align: center; margin-top: 0.25rem; }
   </style>
 </head>
 <body>
@@ -329,6 +367,33 @@
       <button class="btn-icon" id="refresh-btn" title="Refresh">↻</button>
     </div>
     <div id="item-list"></div>
+  </div>
+
+  <!-- Item detail modal -->
+  <div id="item-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <button class="modal-close btn-icon" id="modal-close" aria-label="Close">✕</button>
+      <img id="modal-img" class="modal-img" alt="" />
+      <div class="modal-body">
+        <div class="modal-name" id="modal-name"></div>
+        <div class="modal-meta" id="modal-meta"></div>
+        <div class="modal-notes" id="modal-notes"></div>
+        <div class="modal-section">
+          <label class="modal-label" for="modal-disposition">Disposition</label>
+          <select id="modal-disposition" class="modal-select">
+            <option value="">— not sure yet —</option>
+            <option value="Sell">Sell</option>
+            <option value="Give away">Give away</option>
+            <option value="Donate">Donate</option>
+            <option value="Junk">Junk</option>
+          </select>
+        </div>
+        <button class="btn btn-primary modal-action-btn" id="modal-save-disposition">Save disposition</button>
+        <button class="btn btn-secondary modal-action-btn" id="modal-mark-handled">Mark as handled</button>
+        <button class="btn btn-danger modal-action-btn" id="modal-delete">Delete item</button>
+        <div class="modal-error" id="modal-error" hidden></div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

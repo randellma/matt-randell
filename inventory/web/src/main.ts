@@ -2,6 +2,7 @@ import { LocalStorageSecretStore } from './SecretStore';
 import { AppsScriptStore } from './AppsScriptStore';
 import { getSecretFromUrl } from './getSecretFromUrl';
 import type { Disposition, Item } from './InventoryStore';
+import { deriveLifecycle } from './InventoryStore';
 
 const ENDPOINT_URL =
   'https://script.google.com/macros/s/AKfycbyjJnL9Rv3qyyy_aV2-nrAtICndug41fE-ZCkZEU205fftVSaWIOW_VrOfpdWJFTwH-EQ/exec';
@@ -28,8 +29,20 @@ const queueList = document.getElementById('queue-list')!;
 const viewerStatus = document.getElementById('viewer-status')!;
 const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement;
 const itemList = document.getElementById('item-list')!;
+const itemModal = document.getElementById('item-modal')!;
+const modalClose = document.getElementById('modal-close') as HTMLButtonElement;
+const modalImg = document.getElementById('modal-img') as HTMLImageElement;
+const modalName = document.getElementById('modal-name')!;
+const modalMeta = document.getElementById('modal-meta')!;
+const modalNotes = document.getElementById('modal-notes')!;
+const modalDisposition = document.getElementById('modal-disposition') as HTMLSelectElement;
+const modalSaveDisp = document.getElementById('modal-save-disposition') as HTMLButtonElement;
+const modalMarkHandled = document.getElementById('modal-mark-handled') as HTMLButtonElement;
+const modalDelete = document.getElementById('modal-delete') as HTMLButtonElement;
+const modalError = document.getElementById('modal-error') as HTMLDivElement;
 
 let cachedItems: Item[] | null = null;
+let activeItem: Item | null = null;
 
 // ── Upload queue ──────────────────────────────────────────────────────────────
 
@@ -177,13 +190,14 @@ function lifecycleBadge(lifecycle: Item['lifecycle']): string {
 }
 
 function renderItems(items: Item[]) {
-  if (items.length === 0) {
-    viewerStatus.textContent = 'No items captured yet.';
+  const visible = items.filter(i => i.lifecycle !== 'Handled');
+  if (visible.length === 0) {
+    viewerStatus.textContent = items.length === 0 ? 'No items captured yet.' : 'All items handled.';
     itemList.innerHTML = '';
     return;
   }
   viewerStatus.textContent = '';
-  itemList.innerHTML = items.map(item => {
+  itemList.innerHTML = visible.map(item => {
     const thumb = item.thumbnail
       ? `<img class="item-thumb" src="data:image/jpeg;base64,${item.thumbnail}" alt="${item.name}" />`
       : `<div class="item-thumb-placeholder">📦</div>`;
@@ -194,7 +208,7 @@ function renderItems(items: Item[]) {
       ? `<div class="item-notes">${item.notes}</div>`
       : '';
     return `
-      <div class="item-card">
+      <div class="item-card" data-capturedat="${item.capturedAt}">
         ${thumb}
         <div class="item-body">
           <div class="item-name">${item.name}</div>
@@ -235,6 +249,129 @@ async function loadItems(forceRefresh = false) {
     viewerStatus.textContent = err instanceof Error ? err.message : 'Failed to load items.';
   }
 }
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function openModal(item: Item) {
+  activeItem = item;
+  if (item.thumbnail) {
+    modalImg.src = `data:image/jpeg;base64,${item.thumbnail}`;
+    modalImg.style.display = 'block';
+  } else {
+    modalImg.style.display = 'none';
+  }
+  modalName.textContent = item.name;
+  modalMeta.innerHTML = lifecycleBadge(item.lifecycle) +
+    (item.disposition ? ` <span class="item-disposition">${item.disposition}</span>` : '');
+  modalNotes.textContent = item.notes;
+  (modalNotes as HTMLElement).hidden = !item.notes;
+  modalDisposition.value = item.disposition;
+  modalMarkHandled.disabled = item.lifecycle === 'Handled';
+  modalError.hidden = true;
+  itemModal.removeAttribute('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  activeItem = null;
+  itemModal.setAttribute('hidden', '');
+  document.body.style.overflow = '';
+}
+
+function setModalBusy(busy: boolean) {
+  modalSaveDisp.disabled = busy;
+  modalMarkHandled.disabled = busy || activeItem?.lifecycle === 'Handled';
+  modalDelete.disabled = busy;
+  if (busy) modalError.hidden = true;
+}
+
+function showModalError(msg: string) {
+  modalError.textContent = msg;
+  modalError.hidden = false;
+}
+
+function applyOptimisticUpdate(capturedAt: string, patch: Partial<Item>) {
+  if (!cachedItems) return;
+  const idx = cachedItems.findIndex(i => i.capturedAt === capturedAt);
+  if (idx === -1) return;
+  const updated = { ...cachedItems[idx], ...patch };
+  updated.lifecycle = deriveLifecycle(updated);
+  cachedItems[idx] = updated;
+  renderItems(cachedItems);
+}
+
+itemList.addEventListener('click', (e) => {
+  const card = (e.target as HTMLElement).closest('.item-card') as HTMLElement | null;
+  if (!card || !cachedItems) return;
+  const capturedAt = card.dataset.capturedat;
+  if (!capturedAt) return;
+  const item = cachedItems.find(i => i.capturedAt === capturedAt);
+  if (item) openModal(item);
+});
+
+modalClose.addEventListener('click', closeModal);
+
+itemModal.addEventListener('click', (e) => {
+  if (e.target === itemModal) closeModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !itemModal.hasAttribute('hidden')) closeModal();
+});
+
+modalSaveDisp.addEventListener('click', async () => {
+  if (!activeItem) return;
+  const disposition = modalDisposition.value as Disposition | '';
+  const capturedAt = activeItem.capturedAt;
+  setModalBusy(true);
+  try {
+    await inventoryStore.setDisposition(capturedAt, disposition);
+    applyOptimisticUpdate(capturedAt, { disposition });
+    const refreshed = cachedItems?.find(i => i.capturedAt === capturedAt);
+    if (refreshed) {
+      activeItem = refreshed;
+      modalMeta.innerHTML = lifecycleBadge(refreshed.lifecycle) +
+        (refreshed.disposition ? ` <span class="item-disposition">${refreshed.disposition}</span>` : '');
+      modalMarkHandled.disabled = refreshed.lifecycle === 'Handled';
+    }
+  } catch (err) {
+    showModalError(err instanceof Error ? err.message : 'Failed to save.');
+  } finally {
+    setModalBusy(false);
+  }
+});
+
+modalMarkHandled.addEventListener('click', async () => {
+  if (!activeItem) return;
+  const capturedAt = activeItem.capturedAt;
+  setModalBusy(true);
+  try {
+    await inventoryStore.markHandled(capturedAt);
+    applyOptimisticUpdate(capturedAt, { handledOn: new Date().toISOString() });
+    closeModal();
+  } catch (err) {
+    showModalError(err instanceof Error ? err.message : 'Failed to mark handled.');
+    setModalBusy(false);
+  }
+});
+
+modalDelete.addEventListener('click', async () => {
+  if (!activeItem) return;
+  if (!confirm(`Delete "${activeItem.name}"? This cannot be undone.`)) return;
+  const capturedAt = activeItem.capturedAt;
+  setModalBusy(true);
+  try {
+    await inventoryStore.deleteItem(capturedAt);
+    if (cachedItems) {
+      cachedItems = cachedItems.filter(i => i.capturedAt !== capturedAt);
+      renderItems(cachedItems);
+    }
+    closeModal();
+  } catch (err) {
+    showModalError(err instanceof Error ? err.message : 'Failed to delete.');
+    setModalBusy(false);
+  }
+});
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
