@@ -12,6 +12,14 @@ _Avoid_: App, application, page, project
 The cloud resources managed by Terraform — domain registration in GCP Cloud Domains, plus DNS, tunnels, and static hosting on Cloudflare; configuration lives in `/terraform`. Registrar (GCP) and DNS authority (Cloudflare) are deliberately split — see `docs/adr/0003`.
 _Avoid_: Backend, config, cloud
 
+**Home Server**:
+The self-hosted Linux machine on the home network that runs all self-hosted services. Traffic reaches it via a single Cloudflare Tunnel; Coolify's Traefik routes internally to individual services.
+_Avoid_: VPS, cloud server, local machine
+
+**Coolify**:
+The self-hosted PaaS platform running on the Home Server that manages container lifecycle, Git-triggered deployments, environment variables, and routing for all self-hosted services. The single point of control for what runs on the Home Server.
+_Avoid_: Docker, orchestrator, CI/CD
+
 **Bootstrap**:
 The one-time manual step — creating the GCS state bucket — that must happen before Terraform can manage any Infrastructure.
 _Avoid_: Init, setup
