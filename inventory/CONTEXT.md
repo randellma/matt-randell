@@ -21,6 +21,10 @@ _Avoid_: Category, type, action, outcome
 - **Donate**: Dropped at a local thrift shop. No specific recipient.
 - **Junk**: Thrown away — binned, recycled, or taken to the dump. Leaves the house as waste; no recipient, no money.
 
+**Viewer**:
+The read-only tab in the PWA that lists all Items with their lifecycle badges, Dispositions, and thumbnails. Does not write anything — Review stays in the Sheet.
+_Avoid_: List, dashboard, browse
+
 **Review**:
 Matt and his wife looking at Captured Items and assigning each a Disposition (and any notes).
 _Avoid_: Triage, sort

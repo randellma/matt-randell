@@ -25,7 +25,10 @@ const dispositionSelect = document.getElementById('disposition-select') as HTMLS
 const captureBtn = document.getElementById('capture-btn') as HTMLButtonElement;
 const status = document.getElementById('status')!;
 const viewerStatus = document.getElementById('viewer-status')!;
+const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement;
 const itemList = document.getElementById('item-list')!;
+
+let cachedItems: Item[] | null = null;
 
 function showCapture() {
   gate.style.display = 'none';
@@ -91,12 +94,32 @@ function renderItems(items: Item[]) {
   }).join('');
 }
 
-async function loadItems() {
+async function loadItems(forceRefresh = false) {
+  if (forceRefresh) cachedItems = null;
+
+  if (cachedItems !== null) {
+    renderItems(cachedItems);
+    return;
+  }
+
   viewerStatus.textContent = 'Loading…';
   itemList.innerHTML = '';
+
   try {
-    const items = await inventoryStore.fetchAllItems();
+    // Phase 1: list without thumbnails — renders immediately
+    const items = await inventoryStore.fetchAllItems(false);
     renderItems(items);
+
+    if (items.length === 0) {
+      cachedItems = items;
+      return;
+    }
+
+    // Phase 2: fetch thumbnails and re-render
+    viewerStatus.textContent = 'Loading images…';
+    const itemsWithThumbs = await inventoryStore.fetchAllItems(true);
+    cachedItems = itemsWithThumbs;
+    renderItems(itemsWithThumbs);
   } catch (err) {
     viewerStatus.textContent = err instanceof Error ? err.message : 'Failed to load items.';
   }
@@ -114,6 +137,7 @@ if (urlSecret) {
 
 tabCapture.addEventListener('click', showCapture);
 tabViewer.addEventListener('click', showViewer);
+refreshBtn.addEventListener('click', () => loadItems(true));
 
 secretSave.addEventListener('click', () => {
   const value = secretInput.value.trim();
@@ -170,6 +194,7 @@ captureBtn.addEventListener('click', async () => {
       capturedAt: new Date().toISOString(),
       disposition,
     });
+    cachedItems = null;
     setStatus('Captured!', 'success');
     reset();
   } catch (err) {

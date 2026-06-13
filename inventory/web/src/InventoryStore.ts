@@ -20,5 +20,5 @@ export interface Item {
 
 export interface InventoryStore {
   capture(input: CaptureInput): Promise<void>;
-  fetchAllItems(): Promise<Item[]>;
+  fetchAllItems(withThumbnails?: boolean): Promise<Item[]>;
 }

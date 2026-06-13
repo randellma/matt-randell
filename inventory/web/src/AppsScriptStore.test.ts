@@ -142,11 +142,24 @@ describe('AppsScriptStore.fetchAllItems', () => {
     expect(String(url)).toContain('secret=super-secret');
   });
 
-  it('includes all=1 and thumbnails=1 in the query string', async () => {
+  it('includes all=1 in the query string', async () => {
     const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
     await store.fetchAllItems();
     const [url] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toContain('all=1');
+  });
+
+  it('omits thumbnails=1 when withThumbnails is false (default)', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    await store.fetchAllItems(false);
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).not.toContain('thumbnails=1');
+  });
+
+  it('includes thumbnails=1 when withThumbnails is true', async () => {
+    const store = new AppsScriptStore(ENDPOINT, makeSecretStore('s'));
+    await store.fetchAllItems(true);
+    const [url] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toContain('thumbnails=1');
   });
 

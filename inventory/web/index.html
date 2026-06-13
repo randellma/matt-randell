@@ -156,12 +156,30 @@
       max-width: 30rem;
       margin: 0 auto;
     }
+    #viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 2.5rem;
+      padding: 0.25rem 0;
+    }
     #viewer-status {
       font-size: 0.875rem;
       opacity: 0.75;
-      text-align: center;
-      padding: 1rem 0;
     }
+    .btn-icon {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 1.25rem;
+      cursor: pointer;
+      opacity: 0.7;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.5rem;
+      line-height: 1;
+      transition: opacity 0.15s;
+    }
+    .btn-icon:hover { opacity: 1; }
     #item-list {
       display: flex;
       flex-direction: column;
@@ -261,7 +279,10 @@
 
   <!-- Viewer screen -->
   <div id="viewer">
-    <div id="viewer-status"></div>
+    <div id="viewer-header">
+      <span id="viewer-status"></span>
+      <button class="btn-icon" id="refresh-btn" title="Refresh">↻</button>
+    </div>
     <div id="item-list"></div>
   </div>
 
