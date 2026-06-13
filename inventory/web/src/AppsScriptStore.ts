@@ -19,9 +19,10 @@ export class AppsScriptStore implements InventoryStore {
     private readonly secretStore: SecretStore,
   ) {}
 
-  async fetchAllItems(): Promise<Item[]> {
+  async fetchAllItems(withThumbnails = false): Promise<Item[]> {
     const secret = encodeURIComponent(this.secretStore.get() ?? '');
-    const url = `${this.endpointUrl}?secret=${secret}&all=1&thumbnails=1`;
+    const thumbParam = withThumbnails ? '&thumbnails=1' : '';
+    const url = `${this.endpointUrl}?secret=${secret}&all=1${thumbParam}`;
     const res = await fetch(url);
     const data = await res.json() as { ok?: boolean; error?: string; items?: Item[] };
     if (data.error) {
