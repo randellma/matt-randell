@@ -97,19 +97,6 @@ resource "cloudflare_dns_record" "terraform_managed_resource_c8f861ace31bfc1e311
   settings = {}
 }
 
-resource "cloudflare_dns_record" "terraform_managed_resource_d578d49428387b429ee37e02e9ef2cd8_8" {
-  content = "5986a706-c2c7-4be1-8762-5d602419c423.cfargotunnel.com"
-  name    = "discount-dev.mattrandell.com"
-  proxied = true
-  tags    = []
-  ttl     = 1
-  type    = "CNAME"
-  zone_id = "cb009dc3da4929bf68ef21b73d4552f1"
-  settings = {
-    flatten_cname = false
-  }
-}
-
 resource "cloudflare_dns_record" "terraform_managed_resource_d5e85d6546c182cb0367e07933eff468_9" {
   content = "e75d6d99-e765-434a-a8a6-6619f821ccba.cfargotunnel.com"
   name    = "discount.mattrandell.com"
@@ -203,15 +190,30 @@ resource "cloudflare_dns_record" "terraform_managed_resource_85b4514c40d468c358b
   settings = {}
 }
 
-resource "cloudflare_zero_trust_tunnel_cloudflared" "terraform_managed_resource_5986a706-c2c7-4be1-8762-5d602419c423_0" {
-  account_id = "894ff489298bdf1ca445fc9469854b25"
-  config_src = "cloudflare"
-  name       = "discount-app-dev"
-}
-
 resource "cloudflare_zero_trust_tunnel_cloudflared" "terraform_managed_resource_e75d6d99-e765-434a-a8a6-6619f821ccba_1" {
   account_id = "894ff489298bdf1ca445fc9469854b25"
   config_src = "cloudflare"
   name       = "discount-web-app"
 }
+
+resource "cloudflare_bot_management" "mattrandell" {
+  zone_id    = "cb009dc3da4929bf68ef21b73d4552f1"
+  fight_mode = true
+  enable_js  = true
+}
+
+resource "cloudflare_zone_setting" "hsts" {
+  zone_id     = "cb009dc3da4929bf68ef21b73d4552f1"
+  setting_id  = "security_header"
+  value = {
+    strict_transport_security = {
+      enabled            = true
+      max_age            = 31536000
+      include_subdomains = false
+      preload            = false
+      nosniff            = true
+    }
+  }
+}
+
 
