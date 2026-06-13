@@ -43,6 +43,7 @@ const modalError = document.getElementById('modal-error') as HTMLDivElement;
 
 let cachedItems: Item[] | null = null;
 let activeItem: Item | null = null;
+let deleteConfirmPending = false;
 
 // ── Upload queue ──────────────────────────────────────────────────────────────
 
@@ -269,19 +270,18 @@ function openModal(item: Item) {
   modalMarkHandled.disabled = item.lifecycle === 'Handled';
   modalError.hidden = true;
   itemModal.removeAttribute('hidden');
-  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-  // Always reset button state so the next modal opens clean, even if an
-  // in-flight API call set busy while the user manually dismissed.
+  // Reset all button and confirmation state so the next modal opens clean.
   modalSaveDisp.disabled = false;
   modalMarkHandled.disabled = false;
   modalDelete.disabled = false;
+  modalDelete.textContent = 'Delete item';
+  deleteConfirmPending = false;
   modalError.hidden = true;
   activeItem = null;
   itemModal.setAttribute('hidden', '');
-  document.body.style.overflow = '';
 }
 
 function setModalBusy(busy: boolean) {
@@ -359,7 +359,11 @@ modalMarkHandled.addEventListener('click', () => {
 
 modalDelete.addEventListener('click', () => {
   if (!activeItem) return;
-  if (!confirm(`Delete "${activeItem.name}"? This cannot be undone.`)) return;
+  if (!deleteConfirmPending) {
+    deleteConfirmPending = true;
+    modalDelete.textContent = 'Tap again to confirm';
+    return;
+  }
   const capturedAt = activeItem.capturedAt;
   if (cachedItems) {
     cachedItems = cachedItems.filter(i => i.capturedAt !== capturedAt);
