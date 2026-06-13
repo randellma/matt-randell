@@ -273,6 +273,12 @@ function openModal(item: Item) {
 }
 
 function closeModal() {
+  // Always reset button state so the next modal opens clean, even if an
+  // in-flight API call set busy while the user manually dismissed.
+  modalSaveDisp.disabled = false;
+  modalMarkHandled.disabled = false;
+  modalDelete.disabled = false;
+  modalError.hidden = true;
   activeItem = null;
   itemModal.setAttribute('hidden', '');
   document.body.style.overflow = '';
@@ -341,36 +347,28 @@ modalSaveDisp.addEventListener('click', async () => {
   }
 });
 
-modalMarkHandled.addEventListener('click', async () => {
+modalMarkHandled.addEventListener('click', () => {
   if (!activeItem) return;
   const capturedAt = activeItem.capturedAt;
-  setModalBusy(true);
-  try {
-    await inventoryStore.markHandled(capturedAt);
-    applyOptimisticUpdate(capturedAt, { handledOn: new Date().toISOString() });
-    closeModal();
-  } catch (err) {
-    showModalError(err instanceof Error ? err.message : 'Failed to mark handled.');
-    setModalBusy(false);
-  }
+  applyOptimisticUpdate(capturedAt, { handledOn: new Date().toISOString() });
+  closeModal();
+  inventoryStore.markHandled(capturedAt).catch(() => {
+    // Silent fail — item will reappear on next refresh
+  });
 });
 
-modalDelete.addEventListener('click', async () => {
+modalDelete.addEventListener('click', () => {
   if (!activeItem) return;
   if (!confirm(`Delete "${activeItem.name}"? This cannot be undone.`)) return;
   const capturedAt = activeItem.capturedAt;
-  setModalBusy(true);
-  try {
-    await inventoryStore.deleteItem(capturedAt);
-    if (cachedItems) {
-      cachedItems = cachedItems.filter(i => i.capturedAt !== capturedAt);
-      renderItems(cachedItems);
-    }
-    closeModal();
-  } catch (err) {
-    showModalError(err instanceof Error ? err.message : 'Failed to delete.');
-    setModalBusy(false);
+  if (cachedItems) {
+    cachedItems = cachedItems.filter(i => i.capturedAt !== capturedAt);
+    renderItems(cachedItems);
   }
+  closeModal();
+  inventoryStore.deleteItem(capturedAt).catch(() => {
+    // Silent fail — item will reappear on next refresh
+  });
 });
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
