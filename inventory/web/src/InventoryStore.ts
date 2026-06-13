@@ -21,4 +21,13 @@ export interface Item {
 export interface InventoryStore {
   capture(input: CaptureInput): Promise<void>;
   fetchAllItems(withThumbnails?: boolean): Promise<Item[]>;
+  setDisposition(capturedAt: string, disposition: Disposition | ''): Promise<void>;
+  markHandled(capturedAt: string): Promise<void>;
+  deleteItem(capturedAt: string): Promise<void>;
+}
+
+export function deriveLifecycle(item: Pick<Item, 'disposition' | 'handledOn'>): Lifecycle {
+  if (!item.disposition) return 'Captured';
+  if (item.handledOn) return 'Handled';
+  return 'Reviewed';
 }
