@@ -115,13 +115,57 @@
     .btn-primary { background: white; color: var(--blue); }
     .btn-primary:hover:not(:disabled) { opacity: 0.9; }
 
-    #status {
+    #capture-error {
       font-size: 0.875rem;
-      min-height: 1.25rem;
       text-align: center;
+      color: #fca5a5;
     }
-    #status.error { color: #fca5a5; }
-    #status.success { color: #86efac; }
+
+    /* ── Upload queue chips ── */
+    #queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .queue-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      background: rgba(255,255,255,0.12);
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+    .queue-chip.uploading { animation: chip-pulse 1.2s ease-in-out infinite; }
+    .queue-chip.done    { background: rgba(52, 211, 153, 0.3); }
+    .queue-chip.failed  { background: rgba(220, 38, 38, 0.3); cursor: pointer; }
+    @keyframes chip-pulse {
+      0%, 100% { background: rgba(255,255,255,0.18); }
+      50%       { background: rgba(255,255,255,0.28); }
+    }
+    .chip-thumb {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.3rem;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.1);
+    }
+    .chip-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip-retry { font-size: 0.75rem; opacity: 0.75; flex-shrink: 0; }
+    .chip-indicator { flex-shrink: 0; }
+    .spinner {
+      display: inline-block;
+      width: 0.85rem;
+      height: 0.85rem;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Tab nav ── */
     #tab-nav {
@@ -274,7 +318,8 @@
     </div>
 
     <button class="btn btn-primary" id="capture-btn">Capture</button>
-    <div id="status"></div>
+    <div id="capture-error" hidden></div>
+    <div id="queue-list"></div>
   </div>
 
   <!-- Viewer screen -->
