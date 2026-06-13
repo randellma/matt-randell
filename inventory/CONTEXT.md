@@ -13,13 +13,14 @@ The act of recording an Item while walking around — a photo, a name, and optio
 _Avoid_: Add, create, log
 
 **Disposition**:
-The decision about how an Item leaves the house. One of **Sell**, **Give away**, **Donate**, or **Junk**. May be set at Capture time if known, otherwise assigned at Review.
+The decision about what happens to an Item. One of **Sell**, **Give away**, **Donate**, **Junk**, or **Store**. May be set at Capture time if known, otherwise assigned at Review.
 _Avoid_: Category, type, action, outcome
 
 - **Sell**: Listed for money (e.g. Facebook Marketplace). The only Disposition the AI experimentation ever touches.
 - **Give away**: Handed to a specific recipient for free, via a Facebook Buy Nothing group.
 - **Donate**: Dropped at a local thrift shop. No specific recipient.
 - **Junk**: Thrown away — binned, recycled, or taken to the dump. Leaves the house as waste; no recipient, no money.
+- **Store**: Kept — put away to a long-term home in the house. The Item was mistakenly thought to be junk or unwanted but is actually being kept. Handling means it's been put away properly.
 
 **Viewer**:
 The read-only tab in the PWA that lists all Items with their lifecycle badges, Dispositions, and thumbnails. Does not write anything — Review stays in the Sheet.

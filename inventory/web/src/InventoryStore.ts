@@ -1,4 +1,4 @@
-export type Disposition = 'Sell' | 'Give away' | 'Donate' | 'Junk';
+export type Disposition = 'Sell' | 'Give away' | 'Donate' | 'Junk' | 'Store';
 export type Lifecycle = 'Captured' | 'Reviewed' | 'Handled';
 
 export interface CaptureInput {

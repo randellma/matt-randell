@@ -25,7 +25,7 @@ import { selectAllItems } from "./AllItemsMapper.js";
 import { fetchDriveThumbnail } from "./DriveThumbnailFetcher.js";
 import type { Disposition } from "./CapturePayloadMapper.js";
 
-const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate", "Junk"]);
+const VALID_DISPOSITIONS: ReadonlySet<string> = new Set(["Sell", "Give away", "Donate", "Junk", "Store"]);
 
 // Note: Apps Script always returns HTTP 200; `status` is body-only, not the HTTP status code.
 // Clients must inspect the JSON body's `status` or `error` fields to detect failures.

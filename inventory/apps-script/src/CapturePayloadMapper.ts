@@ -11,7 +11,7 @@
  *   [6] Drive image URL — kept so the listing routine can fetch the photo
  */
 
-export type Disposition = "Sell" | "Give away" | "Donate" | "Junk";
+export type Disposition = "Sell" | "Give away" | "Donate" | "Junk" | "Store";
 
 export interface CapturePayload {
   name: string;
