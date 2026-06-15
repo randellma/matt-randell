@@ -1,0 +1,45 @@
+---
+# Bootstrap the home server: install Coolify and restore its configuration.
+#
+# Prerequisites (run once on the server before this playbook):
+#   gcloud auth login
+#
+# Usage:
+#   ansible-playbook homeserver/setup.yml -i 192.168.2.109, -u <ssh-user> --ask-become-pass
+- name: Bootstrap home server
+  hosts: all
+  become: true
+
+  vars:
+    coolify_dir: /data/coolify/source
+    gcp_project: matt-randell
+    secret_name: coolify-env
+
+  tasks:
+    - name: Install gcloud CLI
+      community.general.snap:
+        name: google-cloud-cli
+        classic: true
+
+    - name: Install Coolify
+      shell: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+      args:
+        creates: "{{ coolify_dir }}/docker-compose.yml"
+
+    - name: Fetch Coolify env from GCP Secret Manager
+      command: >
+        gcloud secrets versions access latest
+        --secret={{ secret_name }}
+        --project={{ gcp_project }}
+      register: coolify_env
+      become: false
+
+    - name: Write Coolify env file
+      copy:
+        content: "{{ coolify_env.stdout }}"
+        dest: "{{ coolify_dir }}/.env"
+        owner: root
+        mode: "0600"
+
+    - name: Restart Coolify with restored config
+      command: docker compose -f {{ coolify_dir }}/docker-compose.yml restart
