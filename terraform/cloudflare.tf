@@ -196,6 +196,19 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "terraform_managed_resource_
   name       = "discount-web-app"
 }
 
+resource "cloudflare_dns_record" "coolify" {
+  content = "e75d6d99-e765-434a-a8a6-6619f821ccba.cfargotunnel.com"
+  name    = "coolify.mattrandell.com"
+  proxied = true
+  tags    = []
+  ttl     = 1
+  type    = "CNAME"
+  zone_id = "cb009dc3da4929bf68ef21b73d4552f1"
+  settings = {
+    flatten_cname = false
+  }
+}
+
 resource "cloudflare_bot_management" "mattrandell" {
   zone_id    = "cb009dc3da4929bf68ef21b73d4552f1"
   fight_mode = true
