@@ -102,7 +102,25 @@ Coolify is running but services aren't deployed yet. Access it via the local net
 http://<server-local-ip>:8000
 ```
 
-Log in with your Coolify admin credentials, then go to **Settings → Backup** and restore the latest backup from the `matt-randell-coolify-backups` GCS bucket. This restores all project and service configurations.
+Before you can restore the backup, you need to configure where the backup lives. The GCS credentials live in Terraform state — retrieve them from your Mac:
+
+```bash
+cd matt-randell/terraform
+terraform output coolify_backup_access_key_id   # Access Key
+terraform output -raw coolify_backup_secret      # Secret Key
+```
+
+Go to **Settings → Backup** and enter:
+
+| Field | Value |
+|---|---|
+| S3 Endpoint | `https://storage.googleapis.com` |
+| Access Key | from `terraform output` above |
+| Secret Key | from `terraform output` above |
+| Bucket | `matt-randell-coolify-backups` |
+| Region | `us` |
+
+Then restore the latest backup. This restores all project and service configurations.
 
 ---
 
