@@ -294,7 +294,14 @@
     .modal-body { display: flex; flex-direction: column; gap: 0.6rem; }
     .modal-name { font-weight: 700; font-size: 1.1rem; }
     .modal-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-    .modal-notes { font-size: 0.85rem; opacity: 0.75; font-style: italic; }
+    .modal-notes-input {
+      padding: 0.65rem 0.9rem; border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 0.5rem; background: rgba(255,255,255,0.12);
+      color: white; font-size: 0.95rem; width: 100%; resize: vertical;
+      min-height: 4rem; font-family: inherit;
+    }
+    .modal-notes-input::placeholder { color: rgba(255,255,255,0.45); }
+    .modal-notes-input:focus { outline: none; border-color: white; }
     .modal-section { display: flex; flex-direction: column; gap: 0.35rem; }
     .modal-label { font-size: 0.8rem; opacity: 0.7; font-weight: 500; }
     .modal-select {
@@ -378,7 +385,11 @@
       <div class="modal-body">
         <div class="modal-name" id="modal-name"></div>
         <div class="modal-meta" id="modal-meta"></div>
-        <div class="modal-notes" id="modal-notes"></div>
+        <div class="modal-section">
+          <label class="modal-label" for="modal-notes">Notes</label>
+          <textarea id="modal-notes" class="modal-notes-input" placeholder="Add notes…" rows="3"></textarea>
+        </div>
+        <button class="btn btn-secondary modal-action-btn" id="modal-save-notes">Save notes</button>
         <div class="modal-section">
           <label class="modal-label" for="modal-disposition">Disposition</label>
           <select id="modal-disposition" class="modal-select">

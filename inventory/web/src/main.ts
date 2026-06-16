@@ -1,14 +1,13 @@
 import { LocalStorageSecretStore } from './SecretStore';
-import { AppsScriptStore } from './AppsScriptStore';
+import { PocketBaseStore } from './PocketBaseStore';
 import { getSecretFromUrl } from './getSecretFromUrl';
 import type { Disposition, Item } from './InventoryStore';
 import { deriveLifecycle } from './InventoryStore';
 
-const ENDPOINT_URL =
-  'https://script.google.com/macros/s/AKfycbyjJnL9Rv3qyyy_aV2-nrAtICndug41fE-ZCkZEU205fftVSaWIOW_VrOfpdWJFTwH-EQ/exec';
+const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL as string ?? 'https://inventory-api.mattrandell.com';
 
 const secretStore = new LocalStorageSecretStore();
-const inventoryStore = new AppsScriptStore(ENDPOINT_URL, secretStore);
+const inventoryStore = new PocketBaseStore(POCKETBASE_URL, secretStore);
 
 const gate = document.getElementById('gate')!;
 const tabNav = document.getElementById('tab-nav')!;
@@ -34,7 +33,8 @@ const modalClose = document.getElementById('modal-close') as HTMLButtonElement;
 const modalImg = document.getElementById('modal-img') as HTMLImageElement;
 const modalName = document.getElementById('modal-name')!;
 const modalMeta = document.getElementById('modal-meta')!;
-const modalNotes = document.getElementById('modal-notes')!;
+const modalNotes = document.getElementById('modal-notes') as HTMLTextAreaElement;
+const modalSaveNotes = document.getElementById('modal-save-notes') as HTMLButtonElement;
 const modalDisposition = document.getElementById('modal-disposition') as HTMLSelectElement;
 const modalSaveDisp = document.getElementById('modal-save-disposition') as HTMLButtonElement;
 const modalMarkHandled = document.getElementById('modal-mark-handled') as HTMLButtonElement;
@@ -200,7 +200,7 @@ function renderItems(items: Item[]) {
   viewerStatus.textContent = '';
   itemList.innerHTML = visible.map(item => {
     const thumb = item.thumbnail
-      ? `<img class="item-thumb" src="data:image/jpeg;base64,${item.thumbnail}" alt="${item.name}" />`
+      ? `<img class="item-thumb" src="${item.thumbnail}" alt="${item.name}" />`
       : `<div class="item-thumb-placeholder">📦</div>`;
     const disposition = item.disposition
       ? `<span class="item-disposition">${item.disposition}</span>`
@@ -232,20 +232,9 @@ async function loadItems(forceRefresh = false) {
   itemList.innerHTML = '';
 
   try {
-    // Phase 1: list without thumbnails — renders immediately
-    const items = await inventoryStore.fetchAllItems(false);
+    const items = await inventoryStore.fetchAllItems();
+    cachedItems = items;
     renderItems(items);
-
-    if (items.length === 0) {
-      cachedItems = items;
-      return;
-    }
-
-    // Phase 2: fetch thumbnails and re-render
-    viewerStatus.textContent = 'Loading images…';
-    const itemsWithThumbs = await inventoryStore.fetchAllItems(true);
-    cachedItems = itemsWithThumbs;
-    renderItems(itemsWithThumbs);
   } catch (err) {
     viewerStatus.textContent = err instanceof Error ? err.message : 'Failed to load items.';
   }
@@ -256,7 +245,7 @@ async function loadItems(forceRefresh = false) {
 function openModal(item: Item) {
   activeItem = item;
   if (item.thumbnail) {
-    modalImg.src = `data:image/jpeg;base64,${item.thumbnail}`;
+    modalImg.src = item.thumbnail;
     modalImg.style.display = 'block';
   } else {
     modalImg.style.display = 'none';
@@ -264,8 +253,7 @@ function openModal(item: Item) {
   modalName.textContent = item.name;
   modalMeta.innerHTML = lifecycleBadge(item.lifecycle) +
     (item.disposition ? ` <span class="item-disposition">${item.disposition}</span>` : '');
-  modalNotes.textContent = item.notes;
-  (modalNotes as HTMLElement).hidden = !item.notes;
+  modalNotes.value = item.notes;
   modalDisposition.value = item.disposition;
   modalMarkHandled.disabled = item.lifecycle === 'Handled';
   modalError.hidden = true;
@@ -274,6 +262,7 @@ function openModal(item: Item) {
 
 function closeModal() {
   // Reset all button and confirmation state so the next modal opens clean.
+  modalSaveNotes.disabled = false;
   modalSaveDisp.disabled = false;
   modalMarkHandled.disabled = false;
   modalDelete.disabled = false;
@@ -285,6 +274,7 @@ function closeModal() {
 }
 
 function setModalBusy(busy: boolean) {
+  modalSaveNotes.disabled = busy;
   modalSaveDisp.disabled = busy;
   modalMarkHandled.disabled = busy || activeItem?.lifecycle === 'Handled';
   modalDelete.disabled = busy;
@@ -323,6 +313,21 @@ itemModal.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !itemModal.hasAttribute('hidden')) closeModal();
+});
+
+modalSaveNotes.addEventListener('click', async () => {
+  if (!activeItem) return;
+  const notes = modalNotes.value.trim();
+  const capturedAt = activeItem.capturedAt;
+  setModalBusy(true);
+  try {
+    await inventoryStore.setNotes(capturedAt, notes);
+    applyOptimisticUpdate(capturedAt, { notes });
+  } catch (err) {
+    showModalError(err instanceof Error ? err.message : 'Failed to save notes.');
+  } finally {
+    setModalBusy(false);
+  }
 });
 
 modalSaveDisp.addEventListener('click', async () => {
