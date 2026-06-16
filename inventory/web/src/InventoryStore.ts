@@ -22,6 +22,7 @@ export interface InventoryStore {
   capture(input: CaptureInput): Promise<void>;
   fetchAllItems(withThumbnails?: boolean): Promise<Item[]>;
   setDisposition(capturedAt: string, disposition: Disposition | ''): Promise<void>;
+  setNotes(capturedAt: string, notes: string): Promise<void>;
   markHandled(capturedAt: string): Promise<void>;
   deleteItem(capturedAt: string): Promise<void>;
 }

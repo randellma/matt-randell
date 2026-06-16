@@ -54,6 +54,10 @@ export class AppsScriptStore implements InventoryStore {
     await this.mutate({ action: 'deleteItem', capturedAt });
   }
 
+  async setNotes(capturedAt: string, notes: string): Promise<void> {
+    await this.mutate({ action: 'setNotes', capturedAt, notes });
+  }
+
   async capture(input: CaptureInput): Promise<void> {
     const photo = await blobToBase64(input.photo);
     const payload: Record<string, string> = {
