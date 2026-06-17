@@ -51,7 +51,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homeserver" {
       },
       {
         hostname = "inventory-api.mattrandell.com"
-        service  = "http://localhost:8090"
+        service  = "http://localhost:8080"
       },
       {
         service = "http_status:404"
