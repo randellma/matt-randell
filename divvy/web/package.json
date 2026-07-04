@@ -1,0 +1,23 @@
+{
+  "name": "divvy-web",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pocketbase": "^0.26.2",
+    "preact": "^10.28.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "jsdom": "^26.1.0",
+    "typescript": "^6.0.3",
+    "vite": "^6.3.5",
+    "vitest": "^4.1.8"
+  }
+}
