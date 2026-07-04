@@ -28,7 +28,10 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   );
   const units = aggregateUnits(nets, members);
   const unitByKey = new Map(units.map(u => [u.key, u]));
-  const unitName = (u: UnitBalance) => u.memberIds.map(nameOf).join(' & ');
+  const unitName = (u: UnitBalance) => {
+    const custom = u.memberIds.map(id => memberById.get(id)?.party_name).find(Boolean);
+    return custom || u.memberIds.map(nameOf).join(' & ');
+  };
   const transfers = suggestSettlements(unitNets(units));
 
   async function run(action: () => Promise<void>) {
@@ -183,13 +186,27 @@ function PartyEditor({
     const ids = selected;
     setSelected([]);
     run(async () => {
-      for (const id of ids) await api.setMemberParty(id, key, token);
+      for (const id of ids) await api.updateMember(id, { party: key, party_name: '' }, token);
     });
   }
 
   function unlink(partyMembers: MemberRecord[]) {
     run(async () => {
-      for (const m of partyMembers) await api.setMemberParty(m.id, '', token);
+      for (const m of partyMembers) await api.updateMember(m.id, { party: '', party_name: '' }, token);
+    });
+  }
+
+  function rename(partyMembers: MemberRecord[]) {
+    const joined = partyMembers.map(m => m.name).join(' & ');
+    const current = partyMembers.map(m => m.party_name).find(Boolean) ?? '';
+    const answer = prompt(
+      `Name this crew (leave empty for "${joined}")`,
+      current,
+    );
+    if (answer === null) return; // cancelled
+    const name = answer.trim().slice(0, 60);
+    run(async () => {
+      for (const m of partyMembers) await api.updateMember(m.id, { party_name: name }, token);
     });
   }
 
@@ -201,14 +218,20 @@ function PartyEditor({
         group sees a combined balance; the breakdown stays visible above.
       </p>
 
-      {[...parties.entries()].map(([key, pm]) => (
-        <div key={key} class="party-row">
-          <span>{pm.map(m => m.name).join(' & ')}</span>
-          <button class="btn small" disabled={busy} onClick={() => unlink(pm)}>
-            Unlink
-          </button>
-        </div>
-      ))}
+      {[...parties.entries()].map(([key, pm]) => {
+        const custom = pm.map(m => m.party_name).find(Boolean);
+        return (
+          <div key={key} class="party-row">
+            <button class="party-name" title="Rename" onClick={() => rename(pm)}>
+              <span>{custom || pm.map(m => m.name).join(' & ')} ✏️</span>
+              {custom && <span class="party-sub">{pm.map(m => m.name).join(' & ')}</span>}
+            </button>
+            <button class="btn small" disabled={busy} onClick={() => unlink(pm)}>
+              Unlink
+            </button>
+          </div>
+        );
+      })}
 
       {solo.length >= 2 && (
         <>

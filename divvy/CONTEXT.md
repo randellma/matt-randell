@@ -37,7 +37,7 @@ The gap between an Expense's total and the sum of its Items — tax, tip, and fe
 _Avoid_: Overhead, surcharge
 
 **Party**:
-Two or more Members linked to settle as one wallet — typically a couple or family. Expenses and Splits stay per-Member; only Balances and settle-up aggregate by Party, so "my wife owes me" never appears at group level while the internal breakdown stays visible for the Party to square up privately. Linking and unlinking is free-form and reversible.
+Two or more Members linked to settle as one wallet — typically a couple or family. Expenses and Splits stay per-Member; only Balances and settle-up aggregate by Party, so "my wife owes me" never appears at group level while the internal breakdown stays visible for the Party to square up privately. Linking and unlinking is free-form and reversible. A Party may take a custom name ("The Randells"); by default it displays as its Members' names joined ("Matt & Sarah").
 _Avoid_: Household (in code), team, subgroup
 
 **Unit**:

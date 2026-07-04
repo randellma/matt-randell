@@ -224,6 +224,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .party-breakdown li { display: flex; justify-content: space-between; }
 .party-row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-weight: 600; }
+.party-name { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; text-align: left; padding: 0; font-weight: 600; }
+.party-sub { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
 
 /* fab */
 .fab {
