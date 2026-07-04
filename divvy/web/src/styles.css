@@ -207,6 +207,24 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .pos { color: var(--green); }
 .neg { color: var(--red); }
 
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.hint.left { text-align: left; }
+.balance-unit { display: flex; flex-direction: column; gap: 0.2rem; }
+.balance-line { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.party-breakdown {
+  list-style: none;
+  margin-left: 0.9rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.party-breakdown li { display: flex; justify-content: space-between; }
+.party-row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-weight: 600; }
+
 /* fab */
 .fab {
   position: fixed;

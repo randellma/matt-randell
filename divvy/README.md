@@ -7,6 +7,10 @@ feature is receipt scanning: photograph a receipt, Claude extracts the line
 items, and you tap names to assign items — tax and tip are divided
 proportionally to what each person ordered.
 
+Couples and families can be linked into a **party** (Balances tab): they order
+individually but settle as one wallet, so group balances stay simple while the
+internal breakdown remains visible.
+
 - **PWA**: `divvy.mattrandell.com` (Cloudflare Pages) — Preact + Vite, in [`web/`](web/)
 - **Backend**: `divvy-api.mattrandell.com` — PocketBase on the Home Server (Coolify,
   via the Cloudflare Tunnel), defined in [`server/`](server/)

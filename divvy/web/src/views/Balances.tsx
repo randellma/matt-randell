@@ -2,7 +2,8 @@ import { useState } from 'preact/hooks';
 import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
 import { formatCents } from '../lib/money';
-import { computeNets, suggestSettlements } from '../lib/balances';
+import { aggregateUnits, computeNets, suggestSettlements, unitNets, type UnitBalance } from '../lib/balances';
+import { newToken } from '../identity';
 
 interface Props {
   group: GroupRecord;
@@ -19,21 +20,39 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   const [error, setError] = useState('');
 
   const memberById = new Map(members.map(m => [m.id, m]));
+  const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
+
   const nets = computeNets(
     expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, entries: e.split.entries })),
     payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
   );
-  // Every member shows up, even with no activity yet.
-  for (const m of members) if (!nets.has(m.id)) nets.set(m.id, 0);
-  const transfers = suggestSettlements(nets);
+  const units = aggregateUnits(nets, members);
+  const unitByKey = new Map(units.map(u => [u.key, u]));
+  const unitName = (u: UnitBalance) => u.memberIds.map(nameOf).join(' & ');
+  const transfers = suggestSettlements(unitNets(units));
 
-  async function recordPayment(from: string, to: string, cents: number) {
-    const fromName = memberById.get(from)?.name;
-    const toName = memberById.get(to)?.name;
-    if (!confirm(`Record that ${fromName} paid ${toName} ${formatCents(cents)}?`)) return;
+  async function run(action: () => Promise<void>) {
     setBusy(true);
     setError('');
     try {
+      await action();
+      onChanged();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function recordTransfer(fromKey: string, toKey: string, cents: number) {
+    const fromUnit = unitByKey.get(fromKey)!;
+    const toUnit = unitByKey.get(toKey)!;
+    // Representatives: within each party, the person deepest in the red pays,
+    // the person most in the black receives — keeps internal breakdowns sane.
+    const from = [...fromUnit.memberCents].sort((a, b) => a.cents - b.cents)[0]!.member;
+    const to = [...toUnit.memberCents].sort((a, b) => b.cents - a.cents)[0]!.member;
+    if (!confirm(`Record that ${unitName(fromUnit)} paid ${unitName(toUnit)} ${formatCents(cents)}?`)) return;
+    run(async () => {
       await api.createPayment(
         {
           group: group.id,
@@ -45,42 +64,37 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
         },
         token,
       );
-      onChanged();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function deletePayment(p: PaymentRecord) {
-    const fromName = memberById.get(p.from_member)?.name;
-    const toName = memberById.get(p.to_member)?.name;
-    if (!confirm(`Remove payment ${fromName} → ${toName} ${formatCents(p.amount_cents)}?`)) return;
-    setBusy(true);
-    try {
-      await api.deletePayment(p.id, token);
-      onChanged();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
+  function deletePayment(p: PaymentRecord) {
+    if (!confirm(`Remove payment ${nameOf(p.from_member)} → ${nameOf(p.to_member)} ${formatCents(p.amount_cents)}?`)) return;
+    run(() => api.deletePayment(p.id, token));
   }
 
   return (
-    <div>
+    <div class="stack">
       <section class="card">
         <h2>Balances</h2>
         <ul class="balance-list">
-          {[...nets]
-            .sort((a, b) => b[1] - a[1])
-            .map(([memberId, cents]) => (
-              <li key={memberId}>
-                <span>{memberById.get(memberId)?.name ?? '?'}</span>
-                <b class={cents > 0 ? 'pos' : cents < 0 ? 'neg' : ''}>
-                  {cents === 0 ? 'settled' : cents > 0 ? `gets ${formatCents(cents)}` : `owes ${formatCents(-cents)}`}
-                </b>
+          {[...units]
+            .sort((a, b) => b.cents - a.cents)
+            .map(u => (
+              <li key={u.key} class="balance-unit">
+                <div class="balance-line">
+                  <span>{unitName(u)}</span>
+                  <BalanceAmount cents={u.cents} />
+                </div>
+                {u.memberIds.length > 1 && (
+                  <ul class="party-breakdown">
+                    {u.memberCents.map(mc => (
+                      <li key={mc.member}>
+                        <span>{nameOf(mc.member)}</span>
+                        <BalanceAmount cents={mc.cents} muted />
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
         </ul>
@@ -93,14 +107,10 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
             {transfers.map(t => (
               <li key={`${t.from}-${t.to}`}>
                 <span>
-                  {memberById.get(t.from)?.name} pays {memberById.get(t.to)?.name}{' '}
+                  {unitName(unitByKey.get(t.from)!)} pays {unitName(unitByKey.get(t.to)!)}{' '}
                   <b>{formatCents(t.cents)}</b>
                 </span>
-                <button
-                  class="btn small"
-                  disabled={busy}
-                  onClick={() => recordPayment(t.from, t.to, t.cents)}
-                >
+                <button class="btn small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
                   Mark paid
                 </button>
               </li>
@@ -109,6 +119,8 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
         </section>
       )}
 
+      <PartyEditor members={members} token={token} busy={busy} run={run} />
+
       {payments.length > 0 && (
         <section class="card">
           <h2>Payments</h2>
@@ -116,8 +128,8 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
             {payments.map(p => (
               <li key={p.id}>
                 <span>
-                  {p.date.slice(0, 10)} · {memberById.get(p.from_member)?.name} →{' '}
-                  {memberById.get(p.to_member)?.name} <b>{formatCents(p.amount_cents)}</b>
+                  {p.date.slice(0, 10)} · {nameOf(p.from_member)} → {nameOf(p.to_member)}{' '}
+                  <b>{formatCents(p.amount_cents)}</b>
                 </span>
                 <button class="item-remove" disabled={busy} onClick={() => deletePayment(p)}>
                   ✕
@@ -130,5 +142,97 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
 
       {error && <p class="error">{error}</p>}
     </div>
+  );
+}
+
+function BalanceAmount({ cents, muted }: { cents: number; muted?: boolean }) {
+  const cls = muted ? '' : cents > 0 ? 'pos' : cents < 0 ? 'neg' : '';
+  return (
+    <b class={cls}>
+      {cents === 0 ? 'settled' : cents > 0 ? `gets ${formatCents(cents)}` : `owes ${formatCents(-cents)}`}
+    </b>
+  );
+}
+
+/**
+ * Link members into parties ("one wallet"). A party is just a shared key on
+ * the member records; unlinking clears it.
+ */
+function PartyEditor({
+  members,
+  token,
+  busy,
+  run,
+}: {
+  members: MemberRecord[];
+  token: string;
+  busy: boolean;
+  run: (action: () => Promise<void>) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+
+  const parties = new Map<string, MemberRecord[]>();
+  for (const m of members) {
+    if (m.party) parties.set(m.party, [...(parties.get(m.party) ?? []), m]);
+  }
+  const solo = members.filter(m => !m.party);
+
+  function link() {
+    if (selected.length < 2) return;
+    const key = newToken().slice(0, 12);
+    const ids = selected;
+    setSelected([]);
+    run(async () => {
+      for (const id of ids) await api.setMemberParty(id, key, token);
+    });
+  }
+
+  function unlink(partyMembers: MemberRecord[]) {
+    run(async () => {
+      for (const m of partyMembers) await api.setMemberParty(m.id, '', token);
+    });
+  }
+
+  return (
+    <section class="card">
+      <h2>Couples & households</h2>
+      <p class="hint left">
+        Linked members settle as one wallet — no more “your wife owes you”. The
+        group sees a combined balance; the breakdown stays visible above.
+      </p>
+
+      {[...parties.entries()].map(([key, pm]) => (
+        <div key={key} class="party-row">
+          <span>{pm.map(m => m.name).join(' & ')}</span>
+          <button class="btn small" disabled={busy} onClick={() => unlink(pm)}>
+            Unlink
+          </button>
+        </div>
+      ))}
+
+      {solo.length >= 2 && (
+        <>
+          <div class="chip-row wrap">
+            {solo.map(m => {
+              const on = selected.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  class={`chip ${on ? 'on' : ''}`}
+                  onClick={() =>
+                    setSelected(on ? selected.filter(s => s !== m.id) : [...selected, m.id])
+                  }
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+          </div>
+          <button class="btn" disabled={busy || selected.length < 2} onClick={link}>
+            Link {selected.length >= 2 ? selected.map(id => members.find(m => m.id === id)?.name).join(' & ') : 'selected'}
+          </button>
+        </>
+      )}
+    </section>
   );
 }

@@ -36,8 +36,16 @@ _Avoid_: Product, entry, line (alone)
 The gap between an Expense's total and the sum of its Items — tax, tip, and fees. Divided among Members in proportion to their Item subtotals: the person who ordered the steak carries more of the tip than the person who had a side.
 _Avoid_: Overhead, surcharge
 
+**Party**:
+Two or more Members linked to settle as one wallet — typically a couple or family. Expenses and Splits stay per-Member; only Balances and settle-up aggregate by Party, so "my wife owes me" never appears at group level while the internal breakdown stays visible for the Party to square up privately. Linking and unlinking is free-form and reversible.
+_Avoid_: Household (in code), team, subgroup
+
+**Unit**:
+What settle-up operates over: a Party, or a solo Member. Every Member belongs to exactly one Unit at any moment.
+_Avoid_: Entity, wallet (colloquially fine in UI copy, not in code)
+
 **Balance**:
-A Member's net position in a Group: what they've paid minus what they owe, across all Expenses and Payments. Positive means the group owes them.
+A Member's net position in a Group: what they've paid minus what they owe, across all Expenses and Payments. Positive means the group owes them. The Balances tab shows Balances aggregated by Unit, with the per-Member breakdown nested inside a Party.
 _Avoid_: Debt, credit, tab
 
 **Payment**:
@@ -47,7 +55,8 @@ _Avoid_: Settlement (the *suggestion* is a settlement; the recorded fact is a Pa
 ## Invariants
 
 - Every Split's per-Member amounts are integer cents summing exactly to the Expense amount — remainder pennies go to the largest fractional shares.
-- Balances across a Group always sum to zero.
+- Balances across a Group always sum to zero — per Member and per Unit alike; linking Members into a Party never creates or destroys money.
+- A Payment between two Members of the same Party changes their internal breakdown but not the Party's group-level Balance.
 - OCR output is a draft: an Itemized Split is never saved until a human has assigned every Item.
 
 ## Example dialogue

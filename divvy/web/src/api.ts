@@ -12,6 +12,8 @@ export interface MemberRecord {
   id: string;
   group: string;
   name: string;
+  /** members sharing a non-empty party key settle as one wallet; '' = solo */
+  party: string;
 }
 
 /** Everything needed to render and re-edit a split, stored as JSON on the expense. */
@@ -85,6 +87,10 @@ export class DivvyApi {
 
   async addMember(groupId: string, name: string, t: string): Promise<MemberRecord> {
     return this.pb.collection('members').create({ group: groupId, name }, { query: { t } });
+  }
+
+  async setMemberParty(memberId: string, party: string, t: string): Promise<MemberRecord> {
+    return this.pb.collection('members').update(memberId, { party }, { query: { t } });
   }
 
   async listExpenses(groupId: string, t: string): Promise<ExpenseRecord[]> {

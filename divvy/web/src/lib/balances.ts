@@ -42,8 +42,60 @@ export function computeNets(
 }
 
 /**
+ * A settlement unit: a linked party acting as one wallet, or a solo member.
+ * `cents` is the combined net; `memberCents` keeps the internal breakdown so
+ * a couple can still square up between themselves.
+ */
+export interface UnitBalance {
+  /** party key for linked members, otherwise the member id */
+  key: string;
+  memberIds: string[];
+  cents: number;
+  memberCents: { member: string; cents: number }[];
+}
+
+/**
+ * Collapse per-member nets into settlement units. Members sharing a non-empty
+ * `party` value form one unit; everyone else is a unit of one. Member ids in
+ * `nets` that aren't in `members` (e.g. deleted members still referenced by
+ * old expenses) become solo units so no money is dropped.
+ */
+export function aggregateUnits(
+  nets: Map<string, number>,
+  members: { id: string; party?: string }[],
+): UnitBalance[] {
+  const units = new Map<string, UnitBalance>();
+  const add = (key: string, member: string, cents: number) => {
+    let unit = units.get(key);
+    if (!unit) {
+      unit = { key, memberIds: [], cents: 0, memberCents: [] };
+      units.set(key, unit);
+    }
+    unit.memberIds.push(member);
+    unit.cents += cents;
+    unit.memberCents.push({ member, cents });
+  };
+
+  const seen = new Set<string>();
+  for (const m of members) {
+    seen.add(m.id);
+    add(m.party || m.id, m.id, nets.get(m.id) ?? 0);
+  }
+  for (const [member, cents] of nets) {
+    if (!seen.has(member)) add(member, member, cents);
+  }
+  return [...units.values()];
+}
+
+/** Combined nets keyed by unit, ready for suggestSettlements. */
+export function unitNets(units: UnitBalance[]): Map<string, number> {
+  return new Map(units.map(u => [u.key, u.cents]));
+}
+
+/**
  * Suggest a small set of transfers that settles all balances: repeatedly pay
  * the largest creditor from the largest debtor. At most n-1 transfers.
+ * Works over member nets or unit nets alike.
  */
 export function suggestSettlements(nets: Map<string, number>): Transfer[] {
   const debtors = [...nets].filter(([, c]) => c < 0).map(([m, c]) => ({ m, c: -c }));
