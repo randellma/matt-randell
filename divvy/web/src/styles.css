@@ -242,6 +242,30 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .fab:active { background: var(--accent-dark); }
 
+/* bottom sheet */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+}
+.sheet {
+  background: var(--card);
+  border-radius: 1rem 1rem 0 0;
+  padding: 1.25rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  animation: sheet-up 0.18s ease-out;
+}
+@keyframes sheet-up { from { transform: translateY(30%); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.sheet h2 { font-size: 1.1rem; }
+
 /* spinner */
 .spinner {
   width: 1.1rem; height: 1.1rem;

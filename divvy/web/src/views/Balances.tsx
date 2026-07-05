@@ -173,6 +173,7 @@ function PartyEditor({
   run: (action: () => Promise<void>) => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [renaming, setRenaming] = useState<MemberRecord[] | null>(null);
 
   const parties = new Map<string, MemberRecord[]>();
   for (const m of members) {
@@ -196,15 +197,8 @@ function PartyEditor({
     });
   }
 
-  function rename(partyMembers: MemberRecord[]) {
-    const joined = partyMembers.map(m => m.name).join(' & ');
-    const current = partyMembers.map(m => m.party_name).find(Boolean) ?? '';
-    const answer = prompt(
-      `Name this crew (leave empty for "${joined}")`,
-      current,
-    );
-    if (answer === null) return; // cancelled
-    const name = answer.trim().slice(0, 60);
+  function saveName(partyMembers: MemberRecord[], name: string) {
+    setRenaming(null);
     run(async () => {
       for (const m of partyMembers) await api.updateMember(m.id, { party_name: name }, token);
     });
@@ -222,7 +216,7 @@ function PartyEditor({
         const custom = pm.map(m => m.party_name).find(Boolean);
         return (
           <div key={key} class="party-row">
-            <button class="party-name" title="Rename" onClick={() => rename(pm)}>
+            <button class="party-name" title="Rename" onClick={() => setRenaming(pm)}>
               <span>{custom || pm.map(m => m.name).join(' & ')} ✏️</span>
               {custom && <span class="party-sub">{pm.map(m => m.name).join(' & ')}</span>}
             </button>
@@ -256,6 +250,58 @@ function PartyEditor({
           </button>
         </>
       )}
+
+      {renaming && (
+        <PartyNameSheet
+          partyMembers={renaming}
+          onSave={name => saveName(renaming, name)}
+          onClose={() => setRenaming(null)}
+        />
+      )}
     </section>
+  );
+}
+
+/** Bottom sheet for naming a party: just a text field, save/cancel. */
+function PartyNameSheet({
+  partyMembers,
+  onSave,
+  onClose,
+}: {
+  partyMembers: MemberRecord[];
+  onSave: (name: string) => void;
+  onClose: () => void;
+}) {
+  const joined = partyMembers.map(m => m.name).join(' & ');
+  const [name, setName] = useState(partyMembers.map(m => m.party_name).find(Boolean) ?? '');
+
+  return (
+    <div class="sheet-overlay" onClick={onClose}>
+      <div class="sheet" onClick={e => e.stopPropagation()}>
+        <h2>Name your crew</h2>
+        <label class="field">
+          <span>Party name</span>
+          <input
+            autofocus
+            value={name}
+            maxLength={60}
+            placeholder={joined}
+            onInput={e => setName((e.target as HTMLInputElement).value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onSave(name.trim());
+            }}
+          />
+        </label>
+        <p class="hint left">Leave empty to go back to “{joined}”.</p>
+        <div class="btn-row">
+          <button class="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button class="btn primary" onClick={() => onSave(name.trim())}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
