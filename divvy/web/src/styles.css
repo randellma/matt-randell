@@ -169,6 +169,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .expense-amount { font-weight: 700; white-space: nowrap; }
 
 /* chips */
+.chip-rows { display: flex; flex-direction: column; gap: 0.4rem; }
 .chip-row { display: flex; gap: 0.4rem; }
 .chip-row.wrap { flex-wrap: wrap; }
 .chip {

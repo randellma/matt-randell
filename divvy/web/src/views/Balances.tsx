@@ -324,22 +324,20 @@ function PaymentSheet({
     label: string;
     resolve: (dir: 'from' | 'to') => string;
   }
-  const options: Option[] = units.flatMap<Option>(u =>
-    u.memberIds.length === 1
-      ? [{ key: u.key, label: nameOf(u.memberIds[0]!), resolve: () => u.memberIds[0]! }]
-      : [
-          ...u.memberIds.map(id => ({ key: id, label: nameOf(id), resolve: () => id })),
-          {
-            key: u.key,
-            label: `👥 ${unitName(u)}`,
-            resolve: dir => {
-              const sorted = [...u.memberCents].sort((a, b) => a.cents - b.cents);
-              return dir === 'from' ? sorted[0]!.member : sorted[sorted.length - 1]!.member;
-            },
-          },
-        ],
+  const memberOptions: Option[] = units.flatMap(u =>
+    u.memberIds.map(id => ({ key: id, label: nameOf(id), resolve: () => id })),
   );
-  const byKey = new Map(options.map(o => [o.key, o]));
+  const partyOptions: Option[] = units
+    .filter(u => u.memberIds.length > 1)
+    .map(u => ({
+      key: u.key,
+      label: `👥 ${unitName(u)}`,
+      resolve: dir => {
+        const sorted = [...u.memberCents].sort((a, b) => a.cents - b.cents);
+        return dir === 'from' ? sorted[0]!.member : sorted[sorted.length - 1]!.member;
+      },
+    }));
+  const byKey = new Map([...memberOptions, ...partyOptions].map(o => [o.key, o]));
 
   const cents = parseAmount(amountText);
   const fromMember = from ? byKey.get(from)!.resolve('from') : '';
@@ -347,9 +345,10 @@ function PaymentSheet({
   const samePerson = !!fromMember && fromMember === toMember;
   const valid = fromMember && toMember && !samePerson && cents !== null && cents > 0;
 
-  const chipRow = (value: string, set: (key: string) => void) => (
-    <div class="chip-row wrap">
-      {options.map(o => (
+  // Parties always get their own row so they never blend in with people.
+  const chipRow = (value: string, set: (key: string) => void) => {
+    const chips = (opts: Option[]) =>
+      opts.map(o => (
         <button
           key={o.key}
           class={`chip ${value === o.key ? 'on' : ''}`}
@@ -357,9 +356,14 @@ function PaymentSheet({
         >
           {o.label}
         </button>
-      ))}
-    </div>
-  );
+      ));
+    return (
+      <div class="chip-rows">
+        <div class="chip-row wrap">{chips(memberOptions)}</div>
+        {partyOptions.length > 0 && <div class="chip-row wrap">{chips(partyOptions)}</div>}
+      </div>
+    );
+  };
 
   return (
     <div class="sheet-overlay" onClick={onClose}>

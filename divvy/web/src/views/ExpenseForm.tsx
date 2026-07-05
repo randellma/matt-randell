@@ -410,40 +410,49 @@ function MemberChips({
 }) {
   const parties = groupParties(members);
   const cls = size ? `chip ${size}` : 'chip';
+  const partyChips = [...parties.values()].map(pm => {
+    const ids = pm.map(m => m.id);
+    const allOn = ids.every(id => selected.includes(id));
+    return (
+      <button
+        key={pm[0]!.party}
+        class={`${cls} party ${allOn ? 'on' : ''}`}
+        onClick={() =>
+          onChange(
+            allOn
+              ? selected.filter(s => !ids.includes(s))
+              : [...selected, ...ids.filter(id => !selected.includes(id))],
+          )
+        }
+      >
+        👥 {partyDisplayName(pm)}
+      </button>
+    );
+  });
+  // Parties always get their own row so they never blend in with people.
   return (
-    <div class="chip-row wrap">
-      {members.map(m => {
-        const on = selected.includes(m.id);
-        return (
-          <button
-            key={m.id}
-            class={`${cls} ${on ? 'on' : ''}`}
-            onClick={() => onChange(on ? selected.filter(s => s !== m.id) : [...selected, m.id])}
-          >
-            {m.name}
-          </button>
-        );
-      })}
-      {[...parties.values()].map(pm => {
-        const ids = pm.map(m => m.id);
-        const allOn = ids.every(id => selected.includes(id));
-        return (
-          <button
-            key={pm[0]!.party}
-            class={`${cls} party ${allOn ? 'on' : ''}`}
-            onClick={() =>
-              onChange(
-                allOn
-                  ? selected.filter(s => !ids.includes(s))
-                  : [...selected, ...ids.filter(id => !selected.includes(id))],
-              )
-            }
-          >
-            👥 {partyDisplayName(pm)}
-          </button>
-        );
-      })}
-      {children}
+    <div class="chip-rows">
+      <div class="chip-row wrap">
+        {members.map(m => {
+          const on = selected.includes(m.id);
+          return (
+            <button
+              key={m.id}
+              class={`${cls} ${on ? 'on' : ''}`}
+              onClick={() => onChange(on ? selected.filter(s => s !== m.id) : [...selected, m.id])}
+            >
+              {m.name}
+            </button>
+          );
+        })}
+        {parties.size === 0 && children}
+      </div>
+      {parties.size > 0 && (
+        <div class="chip-row wrap">
+          {partyChips}
+          {children}
+        </div>
+      )}
     </div>
   );
 }
