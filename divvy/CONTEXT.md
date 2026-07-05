@@ -17,8 +17,12 @@ The Member a device has picked as "you" for a Group, stored locally. Purely a co
 _Avoid_: Login, session
 
 **Expense**:
-Money one Member paid that others owe shares of. Has a description, an amount, a payer, a date, and exactly one Split.
+Money one or more Members paid that others owe shares of. Has a description, an amount, Payers, a date, and exactly one Split.
 _Avoid_: Transaction, bill (a bill is the paper thing a Receipt is a photo of)
+
+**Payer**:
+A Member who fronted part (or all) of an Expense. Usually one; when several people split the bill at the till, each Payer records what they put in, defaulting to an even division of the total. Payer amounts are integer cents summing exactly to the Expense amount.
+_Avoid_: Sponsor, creditor
 
 **Split**:
 How an Expense's amount divides among Members. One of four modes: **Evenly** (participants share equally), **Percent**, **Shares** (weights), or **Itemized** (from a Receipt). Whatever the mode, the stored result is the same shape: per-Member amounts in integer cents that sum exactly to the Expense amount.
@@ -49,12 +53,12 @@ A Member's net position in a Group: what they've paid minus what they owe, acros
 _Avoid_: Debt, credit, tab
 
 **Payment**:
-A recorded settle-up transfer between two Members, outside the app (cash, Venmo, whatever). Recording it is bookkeeping; Divvy never moves money.
+A recorded transfer between two Members, outside the app (cash, Venmo, whatever) — either a settlement suggestion marked paid, or any arbitrary amount recorded by hand. Recording it is bookkeeping; Divvy never moves money.
 _Avoid_: Settlement (the *suggestion* is a settlement; the recorded fact is a Payment), transfer
 
 ## Invariants
 
-- Every Split's per-Member amounts are integer cents summing exactly to the Expense amount — remainder pennies go to the largest fractional shares.
+- Every Split's per-Member amounts are integer cents summing exactly to the Expense amount — remainder pennies go to the largest fractional shares. The same holds for Payer amounts.
 - Balances across a Group always sum to zero — per Member and per Unit alike; linking Members into a Party never creates or destroys money.
 - A Payment between two Members of the same Party changes their internal breakdown but not the Party's group-level Balance.
 - OCR output is a draft: an Itemized Split is never saved until a human has assigned every Item.
