@@ -10,7 +10,10 @@ RUN unzip /tmp/pb.zip -d /pb/ && rm /tmp/pb.zip
 COPY pb_migrations /pb/pb_migrations
 COPY pb_hooks /pb/pb_hooks
 
+WORKDIR /pb
 EXPOSE 8080
 
 # pb_data lives on a Coolify-managed volume; migrations auto-apply on serve.
+# WORKDIR must match where pb_migrations/pb_hooks were copied, since PocketBase
+# resolves them relative to cwd, not the binary's location.
 CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:8080"]
