@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
 import { getJoinedGroup, rememberGroup } from '../identity';
+import { aggregateUnits, computeNets } from '../lib/balances';
 import { formatCents } from '../lib/money';
+import { partyDisplayName } from '../lib/party';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
 
@@ -130,7 +132,24 @@ export function Group({ groupId, token, sub }: Props) {
       </nav>
 
       {tab === 'expenses' ? (
-        <ExpenseList expenses={expenses} memberById={memberById} groupId={groupId} token={token} />
+        <>
+          {expenses.length > 0 && (
+            <GroupSummary
+              expenses={expenses}
+              payments={payments}
+              members={members}
+              me={me!}
+              onShowBalances={() => setTab('balances')}
+            />
+          )}
+          <ExpenseList
+            expenses={expenses}
+            memberById={memberById}
+            memberCount={members.length}
+            groupId={groupId}
+            token={token}
+          />
+        </>
       ) : (
         <Balances
           group={group}
@@ -143,28 +162,91 @@ export function Group({ groupId, token, sub }: Props) {
         />
       )}
 
-      <button class="fab" onClick={() => navigate(groupPath(groupId, token, '/new'))}>
-        +
+      <button class="fab" onClick={() => navigate(groupPath(groupId, token, '/new'))} aria-label="Add expense">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
       </button>
     </div>
+  );
+}
+
+/**
+ * One-glance group position: total spent, how much is still unsettled across
+ * the group (sum of what creditors are owed), and where you stand. Tapping it
+ * jumps to the Balances tab.
+ */
+function GroupSummary({
+  expenses,
+  payments,
+  members,
+  me,
+  onShowBalances,
+}: {
+  expenses: ExpenseRecord[];
+  payments: PaymentRecord[];
+  members: MemberRecord[];
+  me: string;
+  onShowBalances: () => void;
+}) {
+  const totalSpent = expenses.reduce((a, e) => a + e.amount_cents, 0);
+  const nets = computeNets(
+    expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
+    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
+  );
+  const units = aggregateUnits(nets, members);
+  const unsettled = units.reduce((a, u) => a + Math.max(0, u.cents), 0);
+  const myUnit = units.find(u => u.memberIds.includes(me));
+  const mine = myUnit?.cents ?? 0;
+  // If you're in a party, your position is your wallet's — labeled by its name.
+  const label =
+    myUnit && myUnit.memberIds.length > 1
+      ? partyDisplayName(members.filter(m => myUnit.memberIds.includes(m.id)))
+      : 'You';
+  return (
+    <button class="summary-strip" onClick={onShowBalances} title="See balances">
+      <span class="stat">
+        <span>Total spent</span>
+        <b>{formatCents(totalSpent)}</b>
+      </span>
+      <span class="stat">
+        <span>Unsettled</span>
+        <b>{formatCents(unsettled)}</b>
+      </span>
+      <span class="stat">
+        <span>{label}</span>
+        <b class={mine > 0 ? 'pos' : mine < 0 ? 'neg' : ''}>
+          {mine === 0 ? 'settled ✓' : mine > 0 ? `get ${formatCents(mine)}` : `owe ${formatCents(-mine)}`}
+        </b>
+      </span>
+    </button>
   );
 }
 
 function ExpenseList({
   expenses,
   memberById,
+  memberCount,
   groupId,
   token,
 }: {
   expenses: ExpenseRecord[];
   memberById: Map<string, { name: string }>;
+  memberCount: number;
   groupId: string;
   token: string;
 }) {
   if (expenses.length === 0) {
     return <p class="hint">No expenses yet. Tap + to add the first one.</p>;
   }
-  const modeLabel = { even: 'evenly', percent: 'by %', shares: 'by shares', items: 'itemized' };
+  const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
+  const payerNames = (e: ExpenseRecord) =>
+    e.payers?.length ? e.payers.map(p => nameOf(p.member)).join(' & ') : nameOf(e.paid_by);
+  const participants = (e: ExpenseRecord) => {
+    const ids = e.split.entries.map(en => en.member);
+    if (memberCount > 1 && ids.length === memberCount) return 'everyone';
+    return ids.length <= 3 ? ids.map(nameOf).join(', ') : `${ids.length} people`;
+  };
   return (
     <ul class="expense-list">
       {expenses.map(e => (
@@ -173,8 +255,7 @@ function ExpenseList({
             <div class="expense-main">
               <span class="expense-desc">{e.description}</span>
               <span class="expense-meta">
-                {memberById.get(e.paid_by)?.name ?? '?'} paid · split {modeLabel[e.split_mode]} ·{' '}
-                {e.date.slice(0, 10)}
+                {payerNames(e)} paid for {participants(e)} · {e.date.slice(0, 10)}
               </span>
             </div>
             <span class="expense-amount">{formatCents(e.amount_cents)}</span>

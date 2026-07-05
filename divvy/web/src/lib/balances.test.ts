@@ -22,6 +22,30 @@ describe('computeNets', () => {
     expect(nets.get('carol')).toBe(-1000);
   });
 
+  it('credits multiple payers when the expense has them', () => {
+    const nets = computeNets(
+      [
+        {
+          paidBy: 'alice', // largest payer, kept for old clients — ignored here
+          amountCents: 3000,
+          payers: [
+            { member: 'alice', cents: 2000 },
+            { member: 'bob', cents: 1000 },
+          ],
+          entries: [
+            { member: 'alice', cents: 1000 },
+            { member: 'bob', cents: 1000 },
+            { member: 'carol', cents: 1000 },
+          ],
+        },
+      ],
+      [],
+    );
+    expect(nets.get('alice')).toBe(1000);
+    expect(nets.get('bob')).toBe(0);
+    expect(nets.get('carol')).toBe(-1000);
+  });
+
   it('applies payments', () => {
     const nets = computeNets(
       [

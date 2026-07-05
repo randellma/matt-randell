@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
-import { formatCents } from '../lib/money';
+import { formatCents, parseAmount } from '../lib/money';
 import { aggregateUnits, computeNets, suggestSettlements, unitNets, type UnitBalance } from '../lib/balances';
 import { newToken } from '../identity';
 
@@ -18,12 +18,13 @@ interface Props {
 export function Balances({ group, token, members, expenses, payments, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [recording, setRecording] = useState(false);
 
   const memberById = new Map(members.map(m => [m.id, m]));
   const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
 
   const nets = computeNets(
-    expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, entries: e.split.entries })),
+    expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
     payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
   );
   const units = aggregateUnits(nets, members);
@@ -124,15 +125,16 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
 
       <PartyEditor members={members} token={token} busy={busy} run={run} />
 
-      {payments.length > 0 && (
-        <section class="card">
-          <h2>Payments</h2>
+      <section class="card">
+        <h2>Payments</h2>
+        {payments.length > 0 && (
           <ul class="payment-list">
             {payments.map(p => (
               <li key={p.id}>
                 <span>
                   {p.date.slice(0, 10)} · {nameOf(p.from_member)} → {nameOf(p.to_member)}{' '}
                   <b>{formatCents(p.amount_cents)}</b>
+                  {p.note && <span class="payment-note"> · {p.note}</span>}
                 </span>
                 <button class="item-remove" disabled={busy} onClick={() => deletePayment(p)}>
                   ✕
@@ -140,7 +142,38 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
               </li>
             ))}
           </ul>
-        </section>
+        )}
+        <button class="btn" disabled={busy} onClick={() => setRecording(true)}>
+          Record a payment
+        </button>
+        <p class="hint left">
+          For money that changed hands in any other way than the suggestions above.
+        </p>
+      </section>
+
+      {recording && (
+        <PaymentSheet
+          units={units}
+          unitName={unitName}
+          nameOf={nameOf}
+          onClose={() => setRecording(false)}
+          onSave={(from_member, to_member, amount_cents, note) => {
+            setRecording(false);
+            run(async () => {
+              await api.createPayment(
+                {
+                  group: group.id,
+                  from_member,
+                  to_member,
+                  amount_cents,
+                  date: `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`,
+                  note,
+                },
+                token,
+              );
+            });
+          }}
+        />
       )}
 
       {error && <p class="error">{error}</p>}
@@ -259,6 +292,122 @@ function PartyEditor({
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Bottom sheet for recording an arbitrary payment — any amount, between any
+ * two people, not just what settle-up suggests. Chips list every member plus
+ * each party as one wallet; picking a party resolves to its representative
+ * (deepest in the red pays, most in the black receives — same rule as settle).
+ */
+function PaymentSheet({
+  units,
+  unitName,
+  nameOf,
+  onSave,
+  onClose,
+}: {
+  units: UnitBalance[];
+  unitName: (u: UnitBalance) => string;
+  nameOf: (id: string) => string;
+  onSave: (fromMember: string, toMember: string, cents: number, note: string) => void;
+  onClose: () => void;
+}) {
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [amountText, setAmountText] = useState('');
+  const [note, setNote] = useState('');
+
+  interface Option {
+    key: string;
+    label: string;
+    resolve: (dir: 'from' | 'to') => string;
+  }
+  const options: Option[] = units.flatMap<Option>(u =>
+    u.memberIds.length === 1
+      ? [{ key: u.key, label: nameOf(u.memberIds[0]!), resolve: () => u.memberIds[0]! }]
+      : [
+          ...u.memberIds.map(id => ({ key: id, label: nameOf(id), resolve: () => id })),
+          {
+            key: u.key,
+            label: `👥 ${unitName(u)}`,
+            resolve: dir => {
+              const sorted = [...u.memberCents].sort((a, b) => a.cents - b.cents);
+              return dir === 'from' ? sorted[0]!.member : sorted[sorted.length - 1]!.member;
+            },
+          },
+        ],
+  );
+  const byKey = new Map(options.map(o => [o.key, o]));
+
+  const cents = parseAmount(amountText);
+  const fromMember = from ? byKey.get(from)!.resolve('from') : '';
+  const toMember = to ? byKey.get(to)!.resolve('to') : '';
+  const samePerson = !!fromMember && fromMember === toMember;
+  const valid = fromMember && toMember && !samePerson && cents !== null && cents > 0;
+
+  const chipRow = (value: string, set: (key: string) => void) => (
+    <div class="chip-row wrap">
+      {options.map(o => (
+        <button
+          key={o.key}
+          class={`chip ${value === o.key ? 'on' : ''}`}
+          onClick={() => set(o.key === value ? '' : o.key)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div class="sheet-overlay" onClick={onClose}>
+      <div class="sheet" onClick={e => e.stopPropagation()}>
+        <h2>Record a payment</h2>
+        <div class="field">
+          <span>Who paid</span>
+          {chipRow(from, setFrom)}
+        </div>
+        <div class="field">
+          <span>Who received</span>
+          {chipRow(to, setTo)}
+        </div>
+        <div class="field-row">
+          <label class="field grow">
+            <span>Amount</span>
+            <input
+              inputMode="decimal"
+              value={amountText}
+              placeholder="0.00"
+              onInput={e => setAmountText((e.target as HTMLInputElement).value)}
+            />
+          </label>
+          <label class="field grow">
+            <span>Note (optional)</span>
+            <input
+              value={note}
+              maxLength={200}
+              placeholder="Venmo, cash…"
+              onInput={e => setNote((e.target as HTMLInputElement).value)}
+            />
+          </label>
+        </div>
+        {samePerson && <p class="hint warn">Payer and receiver are the same person</p>}
+        <div class="btn-row">
+          <button class="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            class="btn primary"
+            disabled={!valid}
+            onClick={() => onSave(fromMember, toMember, cents!, note.trim())}
+          >
+            Record
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

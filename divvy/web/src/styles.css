@@ -118,6 +118,37 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .mode-tabs { display: flex; background: #e2e8f0; border-radius: 0.6rem; padding: 0.25rem; }
 .mode-tabs button { font-size: 0.9rem; }
 
+/* group summary strip */
+.summary-strip {
+  display: flex;
+  align-items: stretch;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.5rem;
+}
+.summary-strip .stat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 0.4rem;
+}
+.summary-strip .stat + .stat { border-left: 1px solid var(--border); }
+.summary-strip .stat > span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.summary-strip .stat > b { font-size: 0.95rem; white-space: nowrap; }
+
 /* expenses */
 .expense-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
 .expense-row {
@@ -152,6 +183,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .chip.lg { padding: 0.7rem 1.2rem; font-size: 1rem; }
 .chip.sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
 .chip.ghost { border-style: dashed; color: var(--muted); }
+.chip.party { border-style: dashed; }
+.chip.party.on { border-style: solid; }
 
 /* split editors */
 .split-rows { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -159,6 +192,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .split-name { flex: 1; }
 .pct-input { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); }
 .pct-input input { width: 4.5rem; text-align: right; }
+.payer-input { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); }
+.payer-input input { width: 6rem; text-align: right; }
 .stepper { display: flex; align-items: center; gap: 0.25rem; }
 .stepper button {
   width: 2.1rem; height: 2.1rem;
@@ -206,6 +241,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .pos { color: var(--green); }
 .neg { color: var(--red); }
+.payment-note { color: var(--muted); }
 
 .stack { display: flex; flex-direction: column; gap: 1rem; }
 .hint.left { text-align: left; }
@@ -233,13 +269,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   right: max(1rem, calc(50% - 15rem));
   bottom: calc(1.25rem + env(safe-area-inset-bottom));
   width: 3.5rem; height: 3.5rem;
+  padding: 0;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
-  font-size: 2rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
 }
+.fab svg { display: block; }
 .fab:active { background: var(--accent-dark); }
 
 /* bottom sheet */

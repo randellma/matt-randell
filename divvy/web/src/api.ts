@@ -30,12 +30,21 @@ export interface SplitData {
   items?: AssignedItem[];
 }
 
+/** One member's contribution to fronting an expense. */
+export interface PayerEntry {
+  member: string;
+  cents: number;
+}
+
 export interface ExpenseRecord {
   id: string;
   group: string;
   description: string;
   amount_cents: number;
+  /** the largest payer — kept for old records; `payers` is authoritative when present */
   paid_by: string;
+  /** who fronted the money; entries sum to amount_cents. Absent on old records. */
+  payers?: PayerEntry[];
   date: string;
   split_mode: SplitMode;
   split: SplitData;

@@ -3,6 +3,8 @@ import type { SplitEntry } from './split';
 export interface ExpenseForBalance {
   paidBy: string;
   amountCents: number;
+  /** multiple payers; when present, credited instead of paidBy */
+  payers?: { member: string; cents: number }[];
   entries: SplitEntry[];
 }
 
@@ -31,7 +33,11 @@ export function computeNets(
     nets.set(member, (nets.get(member) ?? 0) + cents);
 
   for (const e of expenses) {
-    add(e.paidBy, e.amountCents);
+    if (e.payers?.length) {
+      for (const p of e.payers) add(p.member, p.cents);
+    } else {
+      add(e.paidBy, e.amountCents);
+    }
     for (const entry of e.entries) add(entry.member, -entry.cents);
   }
   for (const p of payments) {

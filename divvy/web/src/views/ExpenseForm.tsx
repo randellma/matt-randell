@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../app';
-import type { ExpenseRecord, GroupRecord, MemberRecord, SplitData } from '../api';
-import { formatCents, parseAmount } from '../lib/money';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, SplitData } from '../api';
+import { allocateEven, formatCents, parseAmount } from '../lib/money';
+import { groupParties, partyDisplayName } from '../lib/party';
 import { computeEven, computePercent, computeShares, type SplitEntry, type SplitMode } from '../lib/split';
 import { computeItemized, type AssignedItem } from '../lib/receipt';
 import { prepareReceiptImage } from '../image';
@@ -27,7 +29,21 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [amountText, setAmountText] = useState(
     expense ? (expense.amount_cents / 100).toFixed(2) : '',
   );
-  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? me);
+  const [payerIds, setPayerIds] = useState<string[]>(
+    expense?.payers?.length ? expense.payers.map(p => p.member) : [expense?.paid_by ?? me],
+  );
+  // Per-payer amount text, shown only with 2+ payers. Follows an even split of
+  // the total until someone hand-edits a value.
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    if (expense?.payers && expense.payers.length > 1) {
+      for (const p of expense.payers) init[p.member] = (p.cents / 100).toFixed(2);
+    }
+    return init;
+  });
+  const [payersEdited, setPayersEdited] = useState(
+    !!expense?.payers && expense.payers.length > 1,
+  );
   const [date, setDate] = useState(
     expense?.date.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
   );
@@ -54,6 +70,32 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [busy, setBusy] = useState(false);
 
   const amountCents = parseAmount(amountText);
+
+  // Keep multi-payer amounts pinned to an even split of the total until edited.
+  useEffect(() => {
+    if (payersEdited || payerIds.length < 2 || amountCents === null || amountCents <= 0) return;
+    const cents = allocateEven(amountCents, payerIds.length);
+    setPayerAmounts(Object.fromEntries(payerIds.map((id, i) => [id, (cents[i]! / 100).toFixed(2)])));
+  }, [payersEdited, payerIds, amountCents]);
+
+  function togglePayers(ids: string[]) {
+    setPayerIds(ids);
+    setPayersEdited(false);
+  }
+
+  function editPayerAmount(id: string, text: string) {
+    setPayersEdited(true);
+    const next = { ...payerAmounts, [id]: text };
+    // With exactly two payers, the other side auto-balances to the total.
+    if (payerIds.length === 2 && amountCents !== null) {
+      const cents = parseAmount(text);
+      const other = payerIds.find(p => p !== id)!;
+      if (cents !== null && cents <= amountCents) {
+        next[other] = ((amountCents - cents) / 100).toFixed(2);
+      }
+    }
+    setPayerAmounts(next);
+  }
 
   // Live preview of what each member will owe, or a reason why we can't compute it.
   const preview = useMemo<{ entries?: SplitEntry[]; problem?: string }>(() => {
@@ -118,6 +160,23 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     if (amountCents === null || amountCents <= 0) return setError('Enter a valid amount');
     if (!preview.entries) return setError(preview.problem ?? 'Split is incomplete');
 
+    let payers: PayerEntry[];
+    if (payerIds.length === 0) return setError('Pick who paid');
+    if (payerIds.length === 1) {
+      payers = [{ member: payerIds[0]!, cents: amountCents }];
+    } else {
+      const entries = payerIds.map(id => ({ member: id, cents: parseAmount(payerAmounts[id] ?? '') }));
+      if (entries.some(p => p.cents === null)) return setError('Enter what each payer paid');
+      const sum = entries.reduce((a, p) => a + p.cents!, 0);
+      if (sum !== amountCents) {
+        return setError(
+          `Payer amounts add up to ${formatCents(sum)}, but the expense is ${formatCents(amountCents)}`,
+        );
+      }
+      payers = entries.filter(p => p.cents! > 0).map(p => ({ member: p.member, cents: p.cents! }));
+    }
+    const paidBy = payers.reduce((a, b) => (b.cents > a.cents ? b : a)).member;
+
     const split: SplitData = { mode, entries: preview.entries };
     if (mode === 'percent') {
       split.percents = Object.fromEntries(
@@ -141,6 +200,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           description: description.trim(),
           amount_cents: amountCents,
           paid_by: paidBy,
+          payers,
           date: `${date} 12:00:00.000Z`,
           split_mode: mode,
           split,
@@ -214,16 +274,29 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             />
           </label>
         </div>
-        <label class="field">
+        <div class="field">
           <span>Paid by</span>
-          <select value={paidBy} onInput={e => setPaidBy((e.target as HTMLSelectElement).value)}>
-            {members.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
+          <MemberChips members={members} selected={payerIds} onChange={togglePayers} />
+        </div>
+        {payerIds.length > 1 && (
+          <div class="split-rows">
+            {payerIds.map(id => (
+              <div key={id} class="split-row">
+                <span class="split-name">{memberById.get(id)?.name ?? '?'}</span>
+                <span class="payer-input">
+                  $
+                  <input
+                    inputMode="decimal"
+                    value={payerAmounts[id] ?? ''}
+                    placeholder="0.00"
+                    onInput={e => editPayerAmount(id, (e.target as HTMLInputElement).value)}
+                  />
+                </span>
+              </div>
             ))}
-          </select>
-        </label>
+            <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} />
+          </div>
+        )}
       </section>
 
       <section class="card">
@@ -236,22 +309,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         </div>
 
         {mode === 'even' && (
-          <div class="chip-row wrap">
-            {members.map(m => {
-              const on = participants.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  class={`chip ${on ? 'on' : ''}`}
-                  onClick={() =>
-                    setParticipants(on ? participants.filter(p => p !== m.id) : [...participants, m.id])
-                  }
-                >
-                  {m.name}
-                </button>
-              );
-            })}
-          </div>
+          <MemberChips members={members} selected={participants} onChange={setParticipants} />
         )}
 
         {mode === 'percent' && (
@@ -332,6 +390,83 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   );
 }
 
+/**
+ * Toggleable member chips, plus one quick-chip per Party that toggles all its
+ * members at once ("👥 The Randells"). Used for payers, participants, and
+ * item assignees so all three selectors feel the same.
+ */
+function MemberChips({
+  members,
+  selected,
+  onChange,
+  size,
+  children,
+}: {
+  members: MemberRecord[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  size?: 'sm';
+  children?: ComponentChildren;
+}) {
+  const parties = groupParties(members);
+  const cls = size ? `chip ${size}` : 'chip';
+  return (
+    <div class="chip-row wrap">
+      {members.map(m => {
+        const on = selected.includes(m.id);
+        return (
+          <button
+            key={m.id}
+            class={`${cls} ${on ? 'on' : ''}`}
+            onClick={() => onChange(on ? selected.filter(s => s !== m.id) : [...selected, m.id])}
+          >
+            {m.name}
+          </button>
+        );
+      })}
+      {[...parties.values()].map(pm => {
+        const ids = pm.map(m => m.id);
+        const allOn = ids.every(id => selected.includes(id));
+        return (
+          <button
+            key={pm[0]!.party}
+            class={`${cls} party ${allOn ? 'on' : ''}`}
+            onClick={() =>
+              onChange(
+                allOn
+                  ? selected.filter(s => !ids.includes(s))
+                  : [...selected, ...ids.filter(id => !selected.includes(id))],
+              )
+            }
+          >
+            👥 {partyDisplayName(pm)}
+          </button>
+        );
+      })}
+      {children}
+    </div>
+  );
+}
+
+function PayerSum({
+  payerIds,
+  payerAmounts,
+  amountCents,
+}: {
+  payerIds: string[];
+  payerAmounts: Record<string, string>;
+  amountCents: number | null;
+}) {
+  if (amountCents === null) return null;
+  const sum = payerIds.reduce((a, id) => a + (parseAmount(payerAmounts[id] ?? '') ?? 0), 0);
+  const ok = sum === amountCents;
+  return (
+    <p class={ok ? 'hint ok' : 'hint warn'}>
+      Paid: {formatCents(sum)} {ok ? '✓' : `(expense is ${formatCents(amountCents)})`}
+    </p>
+  );
+}
+
 function PercentSum({ percents, members }: { percents: Record<string, string>; members: MemberRecord[] }) {
   const sum = members.reduce((a, m) => a + (parseFloat(percents[m.id] ?? '') || 0), 0);
   const ok = Math.abs(sum - 100) <= 0.01;
@@ -364,16 +499,8 @@ function ItemEditor({
   const extras = amountCents !== null ? amountCents - itemSum : null;
   const unassigned = items.filter(i => i.assignees.length === 0).length;
 
-  function toggle(idx: number, memberId: string) {
-    setItems(prev =>
-      prev.map((it, i) => {
-        if (i !== idx) return it;
-        const assignees = it.assignees.includes(memberId)
-          ? it.assignees.filter(a => a !== memberId)
-          : [...it.assignees, memberId];
-        return { ...it, assignees };
-      }),
-    );
+  function setAssignees(idx: number, assignees: string[]) {
+    setItems(prev => prev.map((it, i) => (i === idx ? { ...it, assignees } : it)));
   }
 
   function assignAll(idx: number) {
@@ -442,20 +569,16 @@ function ItemEditor({
                     ✕
                   </button>
                 </div>
-                <div class="chip-row wrap">
-                  {members.map(m => (
-                    <button
-                      key={m.id}
-                      class={`chip sm ${item.assignees.includes(m.id) ? 'on' : ''}`}
-                      onClick={() => toggle(idx, m.id)}
-                    >
-                      {m.name}
-                    </button>
-                  ))}
+                <MemberChips
+                  members={members}
+                  size="sm"
+                  selected={item.assignees}
+                  onChange={ids => setAssignees(idx, ids)}
+                >
                   <button class="chip sm ghost" onClick={() => assignAll(idx)}>
                     everyone
                   </button>
-                </div>
+                </MemberChips>
               </li>
             ))}
           </ul>
