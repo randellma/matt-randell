@@ -99,6 +99,18 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setPercents({ ...percents, [id]: String(next) });
   }
 
+  // Drop someone from the percent split entirely, then re-split 100% evenly
+  // across whoever's left (so you're not left with an under/over 100% mess to
+  // clean up by hand) — small manual tweaks from there are still expected.
+  function removeFromPercent(id: string) {
+    if ((parseFloat(percents[id] ?? '') || 0) <= 0) return;
+    const remaining = members.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0);
+    const shares = allocate(100, remaining.map(() => 1));
+    const next: Record<string, string> = { ...percents, [id]: '0' };
+    remaining.forEach((m, i) => { next[m.id] = String(shares[i]); });
+    setPercents(next);
+  }
+
   function editPayerAmount(id: string, text: string) {
     setPayersEdited(true);
     const next = { ...payerAmounts, [id]: text };
@@ -358,6 +370,13 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                   </span>
                   <button onClick={() => stepPercent(m.id, 5)}>+</button>
                 </span>
+                <button
+                  class="item-remove"
+                  title={`Remove ${m.name}`}
+                  onClick={() => removeFromPercent(m.id)}
+                >
+                  ✕
+                </button>
               </div>
             ))}
             <PercentSum percents={percents} members={members} />
