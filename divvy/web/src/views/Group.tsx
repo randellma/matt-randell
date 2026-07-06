@@ -36,6 +36,12 @@ export function Group({ groupId, token, sub }: Props) {
       setMembers(m);
       setExpenses(e);
       setPayments(p);
+      // Opening a valid link is enough to belong here — remember it in this
+      // context (PWA or browser) so it shows up on Home, keeping any identity
+      // already picked. This is what carries a link-shared group across the
+      // PWA/browser storage divide once you've opened it once.
+      const existing = getJoinedGroup(groupId);
+      rememberGroup({ ...existing, id: g.id, t: token, name: g.name });
     } catch (err) {
       setError('Could not load this group. The link may be wrong or the server unreachable.');
       console.error(err);

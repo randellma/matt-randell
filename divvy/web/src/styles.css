@@ -78,6 +78,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .btn.danger { color: var(--red); border-color: #fecaca; }
 .btn:disabled { opacity: 0.5; }
 .btn-row { display: flex; gap: 0.75rem; justify-content: flex-end; }
+.home-actions { display: flex; flex-direction: column; gap: 0.75rem; }
+.home-actions .btn { display: block; }
 
 .hint { color: var(--muted); font-size: 0.9rem; text-align: center; }
 .hint.warn { color: #b45309; }

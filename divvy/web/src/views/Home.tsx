@@ -1,9 +1,10 @@
 import { useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
-import { listJoinedGroups, newToken, rememberGroup } from '../identity';
+import { listJoinedGroups, newToken, parseGroupLink, rememberGroup } from '../identity';
 
 export function Home() {
   const [creating, setCreating] = useState(false);
+  const [opening, setOpening] = useState(false);
   const groups = listJoinedGroups();
 
   return (
@@ -31,19 +32,75 @@ export function Home() {
 
       {creating ? (
         <CreateGroup onCancel={() => setCreating(false)} />
+      ) : opening ? (
+        <OpenGroup onCancel={() => setOpening(false)} />
       ) : (
-        <button class="btn primary big" onClick={() => setCreating(true)}>
-          + New group
-        </button>
+        <div class="home-actions">
+          <button class="btn primary big" onClick={() => setCreating(true)}>
+            + New group
+          </button>
+          <button class="btn big" onClick={() => setOpening(true)}>
+            Open a group link
+          </button>
+        </div>
       )}
 
-      {groups.length === 0 && !creating && (
+      {groups.length === 0 && !creating && !opening && (
         <p class="hint">
           Create a group and share its link — no accounts, no sign-ups. Anyone
-          with the link is in.
+          with the link is in. Already have a link (say, from Safari)? Tap “Open
+          a group link” to pull it in here.
         </p>
       )}
     </div>
+  );
+}
+
+function OpenGroup({ onCancel }: { onCancel: () => void }) {
+  const [link, setLink] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function open() {
+    const parsed = parseGroupLink(link);
+    if (!parsed) return setError("That doesn't look like a Divvy group link.");
+    setBusy(true);
+    setError('');
+    try {
+      // Confirm the link is real (and grab the name) before remembering it.
+      const group = await api.getGroup(parsed.id, parsed.t);
+      rememberGroup({ id: group.id, t: parsed.t, name: group.name });
+      navigate(groupPath(group.id, parsed.t));
+    } catch {
+      setError("Couldn't open that group — check the link is complete.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="card">
+      <h2>Open a group link</h2>
+      <p class="hint" style="text-align:left">
+        Paste a link someone shared with you, or one you copied from another
+        browser. Anyone with the link is in.
+      </p>
+      <div class="inline-add">
+        <input
+          value={link}
+          placeholder="https://…/#/g/…"
+          onInput={e => setLink((e.target as HTMLInputElement).value)}
+        />
+      </div>
+      {error && <p class="error">{error}</p>}
+      <div class="btn-row">
+        <button class="btn" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button class="btn primary" onClick={open} disabled={busy || !link.trim()}>
+          {busy ? 'Opening…' : 'Open'}
+        </button>
+      </div>
+    </section>
   );
 }
 
