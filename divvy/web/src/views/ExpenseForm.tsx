@@ -331,7 +331,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               onInput={e => setAmountText((e.target as HTMLInputElement).value)}
             />
           </label>
-          <label class="field grow">
+          <label class="field grow date">
             <span>Date</span>
             <input
               type="date"
