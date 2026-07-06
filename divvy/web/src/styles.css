@@ -123,9 +123,17 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .field-row { display: flex; gap: 0.75rem; }
 .field.grow { flex: 1; min-width: 0; }
 
-/* native date control — force it to respect the flex row's width (iOS Safari
-   won't shrink it otherwise) and draw our own calendar glyph, since mobile
-   Safari renders no icon at all while desktop browsers vary. */
+/* iOS Safari's native date control doesn't shrink to fit alongside Amount —
+   it keeps its own preferred width (and sometimes grows taller) regardless
+   of CSS width/padding, so on narrow screens give it the full row instead
+   of squeezing it. */
+@media (max-width: 480px) {
+  .field-row { flex-direction: column; gap: 13px; }
+  .field-row .field.grow { flex: none; }
+}
+
+/* draw our own calendar glyph, since mobile Safari renders no icon on
+   date inputs at all while desktop browsers vary. */
 .date-field { position: relative; display: block; min-width: 0; }
 .date-field input[type="date"] { width: 100%; padding-right: 2.1rem; }
 .date-field .date-icon {
