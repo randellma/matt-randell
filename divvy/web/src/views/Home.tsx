@@ -1,33 +1,99 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
-import { listJoinedGroups, newToken, parseGroupLink, rememberGroup } from '../identity';
+import { aggregateUnits, computeNets } from '../lib/balances';
+import { formatCents } from '../lib/money';
+import { collectiveInitials } from '../lib/avatar';
+import { Avatar } from '../components/Avatar';
+import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
+
+interface GroupSummary {
+  memberCount: number;
+  expenseCount: number;
+  balanceCents?: number;
+}
+
+/** Fetches member/expense counts and your net position for each joined group, best-effort. */
+function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> {
+  const [summaries, setSummaries] = useState<Record<string, GroupSummary>>({});
+  const key = groups.map(g => `${g.id}:${g.t}:${g.memberId ?? ''}`).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    for (const g of groups) {
+      Promise.all([api.listMembers(g.id, g.t), api.listExpenses(g.id, g.t), api.listPayments(g.id, g.t)])
+        .then(([members, expenses, payments]) => {
+          if (cancelled) return;
+          const nets = computeNets(
+            expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
+            payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
+          );
+          const units = aggregateUnits(nets, members);
+          const myUnit = g.memberId ? units.find(u => u.memberIds.includes(g.memberId!)) : undefined;
+          setSummaries(s => ({
+            ...s,
+            [g.id]: { memberCount: members.length, expenseCount: expenses.length, balanceCents: myUnit?.cents },
+          }));
+        })
+        .catch(() => {
+          /* leave this group's summary absent — row falls back to its name only */
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+
+  return summaries;
+}
 
 export function Home() {
   const [creating, setCreating] = useState(false);
   const [opening, setOpening] = useState(false);
   const groups = listJoinedGroups();
+  const summaries = useGroupSummaries(groups);
 
   return (
     <div class="page">
-      <header class="app-header">
-        <h1>Divvy</h1>
-        <p class="tagline">Split expenses without the fuss</p>
-      </header>
+      <div class="rhead">
+        <div class="wordmark">DIVVY</div>
+        <div class="stars">* * * * *</div>
+        <div class="subline">Split expenses without the fuss</div>
+        <div class="subline" style="margin-top:3px;">No accounts · No sign-ups</div>
+      </div>
+      <hr class="rule" />
 
       {groups.length > 0 && (
-        <section class="card">
-          <h2>Your groups</h2>
+        <>
+          <div class="seclbl left">Your groups</div>
           <ul class="group-list">
-            {groups.map(g => (
-              <li key={g.id}>
-                <button class="group-row" onClick={() => navigate(groupPath(g.id, g.t))}>
-                  <span class="group-name">{g.name}</span>
-                  <span class="chevron">›</span>
-                </button>
-              </li>
-            ))}
+            {groups.map((g, i) => {
+              const s = summaries[g.id];
+              return (
+                <li key={g.id}>
+                  {i > 0 && <hr class="rule" />}
+                  <button class="row-btn group-row" onClick={() => navigate(groupPath(g.id, g.t))}>
+                    <Avatar initials={collectiveInitials(g.name)} color="#0B7A4E" size={42} />
+                    <span class="group-row-main">
+                      <span class="group-name">{g.name}</span>
+                      <span class="group-meta">
+                        {s ? `${s.memberCount} member${s.memberCount === 1 ? '' : 's'} · ${s.expenseCount} expense${s.expenseCount === 1 ? '' : 's'}` : '···'}
+                      </span>
+                    </span>
+                    {s?.balanceCents !== undefined && s.balanceCents !== 0 && (
+                      <span class="group-balance">
+                        <b class={`num ${s.balanceCents > 0 ? 'pos' : 'neg'}`}>
+                          {s.balanceCents > 0 ? '+' : '-'}{formatCents(Math.abs(s.balanceCents))}
+                        </b>
+                        <span>{s.balanceCents > 0 ? "you're owed" : 'you owe'}</span>
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
-        </section>
+          <hr class="rule" />
+        </>
       )}
 
       {creating ? (
@@ -36,7 +102,7 @@ export function Home() {
         <OpenGroup onCancel={() => setOpening(false)} />
       ) : (
         <div class="home-actions">
-          <button class="btn primary big" onClick={() => setCreating(true)}>
+          <button class="btn ink big" onClick={() => setCreating(true)}>
             + New group
           </button>
           <button class="btn big" onClick={() => setOpening(true)}>
@@ -46,12 +112,17 @@ export function Home() {
       )}
 
       {groups.length === 0 && !creating && !opening && (
-        <p class="hint">
-          Create a group and share its link — no accounts, no sign-ups. Anyone
-          with the link is in. Already have a link (say, from Safari)? Tap “Open
+        <p class="hint sans">
+          A group is just a link — anyone with it is in. No accounts, no
+          sign-ups, no fuss. Already have a link (say, from Safari)? Tap “Open
           a group link” to pull it in here.
         </p>
       )}
+
+      <hr class="rule" style="margin-top:6px;" />
+      <div class="barcode" />
+      <div class="barnum">DIVVY · SPLIT EXPENSES</div>
+      <div class="rhead subline" style="margin-top:2px;">*** Thank you ***</div>
     </div>
   );
 }
@@ -78,9 +149,9 @@ function OpenGroup({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <section class="card">
+    <section class="ticket-box">
       <h2>Open a group link</h2>
-      <p class="hint" style="text-align:left">
+      <p class="hint sans" style="text-align:left">
         Paste a link someone shared with you, or one you copied from another
         browser. Anyone with the link is in.
       </p>
@@ -143,7 +214,7 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <section class="card">
+    <section class="ticket-box">
       <h2>New group</h2>
       <label class="field">
         <span>Group name</span>

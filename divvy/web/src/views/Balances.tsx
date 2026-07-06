@@ -4,6 +4,8 @@ import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '..
 import { formatCents, parseAmount } from '../lib/money';
 import { aggregateUnits, computeNets, suggestSettlements, unitNets, type UnitBalance } from '../lib/balances';
 import { newToken } from '../identity';
+import { colorForBalance, collectiveInitials } from '../lib/avatar';
+import { Avatar } from '../components/Avatar';
 
 interface Props {
   group: GroupRecord;
@@ -78,57 +80,75 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
 
   return (
     <div class="stack">
-      <section class="card">
-        <h2>Balances</h2>
+      <div>
+        <div class="seclbl left">The ledger</div>
         <ul class="balance-list">
           {[...units]
             .sort((a, b) => b.cents - a.cents)
-            .map(u => (
-              <li key={u.key} class="balance-unit">
-                <div class="balance-line">
-                  <span>{unitName(u)}</span>
-                  <BalanceAmount cents={u.cents} />
+            .map((u, i) => (
+              <li key={u.key}>
+                {i > 0 && <hr class="rule" style="margin-bottom:16px;" />}
+                <div class="balance-unit">
+                  <div class="balance-line">
+                    <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} />
+                    <span class="name">{unitName(u)}</span>
+                    <BalanceAmount cents={u.cents} />
+                  </div>
+                  {u.memberIds.length > 1 && (
+                    <ul class="party-breakdown">
+                      {u.memberCents.map(mc => (
+                        <li key={mc.member} class="li">
+                          <span class="nm faint">{nameOf(mc.member)}</span>
+                          <span class="lead" />
+                          <span class="amt" style={{ color: mc.cents < 0 ? 'var(--red)' : 'var(--accent)' }}>
+                            {mc.cents < 0 ? '−' : '+'}{formatCents(Math.abs(mc.cents))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                {u.memberIds.length > 1 && (
-                  <ul class="party-breakdown">
-                    {u.memberCents.map(mc => (
-                      <li key={mc.member}>
-                        <span>{nameOf(mc.member)}</span>
-                        <BalanceAmount cents={mc.cents} muted />
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </li>
             ))}
         </ul>
-      </section>
+      </div>
+      <hr class="rule solid" />
 
       {transfers.length > 0 && (
-        <section class="card">
-          <h2>Settle up</h2>
-          <ul class="settle-list">
-            {transfers.map(t => (
-              <li key={`${t.from}-${t.to}`}>
-                <span>
-                  {unitName(unitByKey.get(t.from)!)} pays {unitName(unitByKey.get(t.to)!)}{' '}
-                  <b>{formatCents(t.cents)}</b>
-                </span>
-                <button class="btn small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
-                  Mark paid
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <>
+          <div>
+            <div class="seclbl left">Settle up</div>
+            <ul class="settle-list">
+              {transfers.map(t => {
+                const from = unitByKey.get(t.from)!;
+                const to = unitByKey.get(t.to)!;
+                return (
+                  <li key={`${t.from}-${t.to}`} class="settle-row">
+                    <span class="settle-people">
+                      <Avatar initials={collectiveInitials(unitName(from))} color="#B84A38" size={26} />
+                      <span class="settle-arrow">→</span>
+                      <Avatar initials={collectiveInitials(unitName(to))} color="#0B7A4E" size={26} />
+                      <span>{unitName(from)} pays {unitName(to)} {formatCents(t.cents)}</span>
+                    </span>
+                    <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
+                      Mark paid
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <hr class="rule" />
+        </>
       )}
 
-      <PartyEditor members={members} token={token} busy={busy} run={run} />
+      <PartyEditor members={members} token={token} busy={busy} run={run} unitByKey={unitByKey} />
+      <hr class="rule" />
 
-      <section class="card">
-        <h2>Payments</h2>
+      <div>
+        <div class="seclbl left">Payments</div>
         {payments.length > 0 && (
-          <ul class="payment-list">
+          <ul class="payment-list" style="margin-top:11px;">
             {payments.map(p => (
               <li key={p.id}>
                 <span>
@@ -143,13 +163,13 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
             ))}
           </ul>
         )}
-        <button class="btn" disabled={busy} onClick={() => setRecording(true)}>
+        <button class="btn" style="margin-top:11px;" disabled={busy} onClick={() => setRecording(true)}>
           Record a payment
         </button>
-        <p class="hint left">
+        <p class="hint sans left">
           For money that changed hands in any other way than the suggestions above.
         </p>
-      </section>
+      </div>
 
       {recording && (
         <PaymentSheet
@@ -181,12 +201,12 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   );
 }
 
-function BalanceAmount({ cents, muted }: { cents: number; muted?: boolean }) {
-  const cls = muted ? '' : cents > 0 ? 'pos' : cents < 0 ? 'neg' : '';
+function BalanceAmount({ cents }: { cents: number }) {
+  if (cents === 0) return <span class="stamp">Settled</span>;
   return (
-    <b class={cls}>
-      {cents === 0 ? 'settled' : cents > 0 ? `gets ${formatCents(cents)}` : `owes ${formatCents(-cents)}`}
-    </b>
+    <span class={`stamp ${cents < 0 ? 'red' : ''}`}>
+      {cents > 0 ? `Gets ${formatCents(cents)}` : `Owes ${formatCents(-cents)}`}
+    </span>
   );
 }
 
@@ -199,11 +219,13 @@ function PartyEditor({
   token,
   busy,
   run,
+  unitByKey,
 }: {
   members: MemberRecord[];
   token: string;
   busy: boolean;
   run: (action: () => Promise<void>) => void;
+  unitByKey: Map<string, UnitBalance>;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<MemberRecord[] | null>(null);
@@ -238,19 +260,22 @@ function PartyEditor({
   }
 
   return (
-    <section class="card">
-      <h2>Couples & households</h2>
-      <p class="hint left">
-        Linked members settle as one wallet — no more “your wife owes you”. The
-        group sees a combined balance; the breakdown stays visible above.
+    <div class="stack-sm">
+      <div class="seclbl left">Couples &amp; households</div>
+      <p class="hint sans left">
+        Linked members settle as one wallet — the group sees a combined
+        balance; the breakdown stays visible above.
       </p>
 
       {[...parties.entries()].map(([key, pm]) => {
         const custom = pm.map(m => m.party_name).find(Boolean);
+        const displayName = custom || pm.map(m => m.name).join(' & ');
+        const cents = unitByKey.get(key)?.cents ?? 0;
         return (
           <div key={key} class="party-row">
+            <Avatar initials={collectiveInitials(displayName)} color={colorForBalance(cents)} size={30} />
             <button class="party-name" title="Rename" onClick={() => setRenaming(pm)}>
-              <span>{custom || pm.map(m => m.name).join(' & ')} ✏️</span>
+              <span>{displayName} ✏️</span>
               {custom && <span class="party-sub">{pm.map(m => m.name).join(' & ')}</span>}
             </button>
             <button class="btn small" disabled={busy} onClick={() => unlink(pm)}>
@@ -291,7 +316,7 @@ function PartyEditor({
           onClose={() => setRenaming(null)}
         />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -331,7 +356,7 @@ function PaymentSheet({
     .filter(u => u.memberIds.length > 1)
     .map(u => ({
       key: u.key,
-      label: `👥 ${unitName(u)}`,
+      label: unitName(u),
       resolve: dir => {
         const sorted = [...u.memberCents].sort((a, b) => a.cents - b.cents);
         return dir === 'from' ? sorted[0]!.member : sorted[sorted.length - 1]!.member;
@@ -347,11 +372,11 @@ function PaymentSheet({
 
   // Parties always get their own row so they never blend in with people.
   const chipRow = (value: string, set: (key: string) => void) => {
-    const chips = (opts: Option[]) =>
+    const chips = (opts: Option[], isParty: boolean) =>
       opts.map(o => (
         <button
           key={o.key}
-          class={`chip ${value === o.key ? 'on' : ''}`}
+          class={`chip ${isParty ? 'party' : ''} ${value === o.key ? 'on' : ''}`}
           onClick={() => set(o.key === value ? '' : o.key)}
         >
           {o.label}
@@ -359,8 +384,8 @@ function PaymentSheet({
       ));
     return (
       <div class="chip-rows">
-        <div class="chip-row wrap">{chips(memberOptions)}</div>
-        {partyOptions.length > 0 && <div class="chip-row wrap">{chips(partyOptions)}</div>}
+        <div class="chip-row wrap">{chips(memberOptions, false)}</div>
+        {partyOptions.length > 0 && <div class="chip-row wrap">{chips(partyOptions, true)}</div>}
       </div>
     );
   };
@@ -445,7 +470,7 @@ function PartyNameSheet({
             }}
           />
         </label>
-        <p class="hint left">Leave empty to go back to “{joined}”.</p>
+        <p class="hint sans left">Leave empty to go back to “{joined}”.</p>
         <div class="btn-row">
           <button class="btn" onClick={onClose}>
             Cancel

@@ -4,8 +4,8 @@
   "description": "Split expenses with friends and family",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#059669",
+  "background_color": "#FAF7EF",
+  "theme_color": "#0B7A4E",
   "icons": [
     {
       "src": "/icons/icon-192.png",

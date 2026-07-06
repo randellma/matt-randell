@@ -7,6 +7,8 @@ import { groupParties, partyDisplayName } from '../lib/party';
 import { computeEven, computePercent, computeShares, type SplitEntry, type SplitMode } from '../lib/split';
 import { computeItemized, type AssignedItem } from '../lib/receipt';
 import { prepareReceiptImage } from '../image';
+import { colorForId, personInitial } from '../lib/avatar';
+import { Avatar } from '../components/Avatar';
 
 interface Props {
   group: GroupRecord;
@@ -245,8 +247,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           </button>
         )}
       </header>
+      <div class="rhead subline">{expense ? 'Editing a line for' : 'New line for'} {group.name}</div>
+      <hr class="rule" />
 
-      <section class="card">
+      <div>
         <label class="field">
           <span>Description</span>
           <input
@@ -255,7 +259,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             onInput={e => setDescription((e.target as HTMLInputElement).value)}
           />
         </label>
-        <div class="field-row">
+        <div class="field-row" style="margin-top:13px;">
           <label class="field grow">
             <span>Amount</span>
             <input
@@ -274,12 +278,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             />
           </label>
         </div>
-        <div class="field">
+        <div class="field" style="margin-top:14px;">
           <span>Paid by</span>
           <MemberChips members={members} selected={payerIds} onChange={togglePayers} />
         </div>
         {payerIds.length > 1 && (
-          <div class="split-rows">
+          <div class="split-rows" style="margin-top:11px;">
             {payerIds.map(id => (
               <div key={id} class="split-row">
                 <span class="split-name">{memberById.get(id)?.name ?? '?'}</span>
@@ -297,10 +301,14 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} />
           </div>
         )}
-      </section>
+      </div>
+      <hr class="rule" />
 
-      <section class="card">
-        <div class="mode-tabs">
+      <div>
+        <label class="field">
+          <span>Split method</span>
+        </label>
+        <div class="mode-tabs" style="margin-top:2px;">
           {MODES.map(m => (
             <button key={m.id} class={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>
               {m.label}
@@ -309,13 +317,17 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         </div>
 
         {mode === 'even' && (
-          <MemberChips members={members} selected={participants} onChange={setParticipants} />
+          <div style="margin-top:13px;">
+            <p class="hint sans" style="margin:0 0 11px;text-align:left;">Tap who was in on this one.</p>
+            <MemberChips members={members} selected={participants} onChange={setParticipants} />
+          </div>
         )}
 
         {mode === 'percent' && (
-          <div class="split-rows">
+          <div class="split-rows" style="margin-top:13px;">
             {members.map(m => (
               <div key={m.id} class="split-row">
+                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
                 <span class="split-name">{m.name}</span>
                 <span class="pct-input">
                   <input
@@ -335,9 +347,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         )}
 
         {mode === 'shares' && (
-          <div class="split-rows">
+          <div class="split-rows" style="margin-top:13px;">
             {members.map(m => (
               <div key={m.id} class="split-row">
+                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
                 <span class="split-name">{m.name}</span>
                 <span class="stepper">
                   <button onClick={() => setShares({ ...shares, [m.id]: Math.max(0, (shares[m.id] ?? 0) - 1) })}>
@@ -354,45 +367,62 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         )}
 
         {mode === 'items' && (
-          <ItemEditor
-            items={items}
-            setItems={setItems}
-            members={members}
-            amountCents={amountCents}
-            scanState={scanState}
-            onScan={scanReceipt}
-          />
+          <div style="margin-top:13px;">
+            <ItemEditor
+              items={items}
+              setItems={setItems}
+              members={members}
+              amountCents={amountCents}
+              scanState={scanState}
+              onScan={scanReceipt}
+            />
+          </div>
         )}
-      </section>
+      </div>
+      <hr class="rule" />
 
-      <section class="card preview">
-        <h2>Who owes what</h2>
+      <div>
+        <div class="seclbl left">Who owes what</div>
         {preview.entries ? (
-          <ul class="preview-list">
-            {preview.entries.map(e => (
-              <li key={e.member}>
-                <span>{memberById.get(e.member)?.name ?? '?'}</span>
-                <b>{formatCents(e.cents)}</b>
-              </li>
-            ))}
+          <ul class="preview-list" style="margin-top:11px;">
+            {(() => {
+              const entries = preview.entries!;
+              const maxCents = Math.max(1, ...entries.map(e => e.cents));
+              return entries.map(e => (
+                <li key={e.member}>
+                  <Avatar initials={personInitial(memberById.get(e.member)?.name ?? '?')} color={colorForId(e.member)} size={28} />
+                  <span class="preview-name">{memberById.get(e.member)?.name ?? '?'}</span>
+                  <span class="preview-bar-track">
+                    <span class="preview-bar-fill" style={{ width: `${Math.round((e.cents / maxCents) * 100)}%` }} />
+                  </span>
+                  <b class="num">{formatCents(e.cents)}</b>
+                </li>
+              ));
+            })()}
           </ul>
         ) : (
-          <p class="hint">{preview.problem}</p>
+          <p class="hint" style="margin-top:11px;">{preview.problem}</p>
         )}
-      </section>
+      </div>
+      <hr class="rule solid" />
 
       {error && <p class="error">{error}</p>}
 
       <button class="btn primary big" onClick={save} disabled={busy || scanState === 'working'}>
-        {busy ? 'Saving…' : expense ? 'Save changes' : 'Add expense'}
+        {busy
+          ? 'Saving…'
+          : `${expense ? 'Save changes' : 'Add expense'}${amountCents !== null && amountCents > 0 ? ` · ${formatCents(amountCents)}` : ''}`}
       </button>
+      <hr class="rule" style="margin-top:8px;" />
+      <div class="barcode" />
+      <div class="barnum">DIVVY · {date.slice(5, 7)}/{date.slice(8, 10)}/{date.slice(0, 4)}</div>
     </div>
   );
 }
 
 /**
  * Toggleable member chips, plus one quick-chip per Party that toggles all its
- * members at once ("👥 The Randells"). Used for payers, participants, and
+ * members at once ("The Randells"). Used for payers, participants, and
  * item assignees so all three selectors feel the same.
  */
 function MemberChips({
@@ -410,6 +440,7 @@ function MemberChips({
 }) {
   const parties = groupParties(members);
   const cls = size ? `chip ${size}` : 'chip';
+  const avatarSize = size === 'sm' ? 20 : 24;
   const partyChips = [...parties.values()].map(pm => {
     const ids = pm.map(m => m.id);
     const allOn = ids.every(id => selected.includes(id));
@@ -425,7 +456,7 @@ function MemberChips({
           )
         }
       >
-        👥 {partyDisplayName(pm)}
+        {partyDisplayName(pm)}
       </button>
     );
   });
@@ -438,9 +469,10 @@ function MemberChips({
           return (
             <button
               key={m.id}
-              class={`${cls} ${on ? 'on' : ''}`}
+              class={`${cls} with-avatar ${on ? 'on' : ''}`}
               onClick={() => onChange(on ? selected.filter(s => s !== m.id) : [...selected, m.id])}
             >
+              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={avatarSize} />
               {m.name}
             </button>
           );
@@ -544,7 +576,7 @@ function ItemEditor({
         </div>
       ) : (
         <label class="btn scan-btn">
-          📷 {items.length ? 'Rescan receipt' : 'Scan receipt'}
+          {items.length ? 'Rescan receipt' : 'Scan receipt'}
           <input
             type="file"
             accept="image/*"
@@ -560,14 +592,15 @@ function ItemEditor({
 
       {items.length > 0 && (
         <>
-          <p class="hint">
-            Tap names to assign each item. Items with several people are split between them.
+          <p class="hint sans">
+            Tap names to assign each line. Shared items split evenly; tax &amp; tip follow what each person ordered.
           </p>
           <ul class="item-list">
             {items.map((item, idx) => (
               <li key={idx} class={`item ${item.assignees.length === 0 ? 'unassigned' : ''}`}>
                 <div class="item-head">
                   <span class="item-label">{item.label}</span>
+                  <span class="lead" />
                   <button class="item-price" onClick={() => editPrice(idx)}>
                     {formatCents(item.cents)}
                   </button>
@@ -593,11 +626,11 @@ function ItemEditor({
           </ul>
 
           <div class="totals-line">
-            <span>Items: {formatCents(itemSum)}</span>
+            <div class="li"><span class="nm muted">Items</span><span class="lead" /><span class="amt">{formatCents(itemSum)}</span></div>
             {extras !== null && (
-              <span class={extras < 0 ? 'warn' : ''}>
-                Tax & tip: {formatCents(extras)} (split proportionally)
-              </span>
+              <div class={`li ${extras < 0 ? 'warn' : ''}`}>
+                <span class="nm muted">Tax &amp; tip · proportional</span><span class="lead" /><span class="amt">{formatCents(extras)}</span>
+              </div>
             )}
           </div>
           {unassigned > 0 && (

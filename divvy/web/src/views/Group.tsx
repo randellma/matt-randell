@@ -5,6 +5,8 @@ import { getJoinedGroup, rememberGroup } from '../identity';
 import { aggregateUnits, computeNets } from '../lib/balances';
 import { formatCents } from '../lib/money';
 import { partyDisplayName } from '../lib/party';
+import { colorForId, personInitial } from '../lib/avatar';
+import { Avatar, AvatarStack } from '../components/Avatar';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
 
@@ -120,7 +122,7 @@ export function Group({ groupId, token, sub }: Props) {
         <div class="group-title">
           <h1>{group.name}</h1>
           <button class="me-chip" title="Switch who you are" onClick={() => setMe(undefined)}>
-            you: {memberById.get(me!)?.name}
+            Receipt #{receiptNumber(group.id)} · You: {memberById.get(me!)?.name}
           </button>
         </div>
         <button class="btn small" onClick={share}>
@@ -139,21 +141,15 @@ export function Group({ groupId, token, sub }: Props) {
 
       {tab === 'expenses' ? (
         <>
-          {expenses.length > 0 && (
-            <GroupSummary
-              expenses={expenses}
-              payments={payments}
-              members={members}
-              me={me!}
-              onShowBalances={() => setTab('balances')}
-            />
-          )}
+          <WalletSummary expenses={expenses} payments={payments} members={members} me={me!} />
+          <div class="seclbl left">Recent expenses</div>
           <ExpenseList
             expenses={expenses}
             memberById={memberById}
             memberCount={members.length}
             groupId={groupId}
             token={token}
+            me={me!}
           />
         </>
       ) : (
@@ -177,23 +173,27 @@ export function Group({ groupId, token, sub }: Props) {
   );
 }
 
+/** A stable 4-digit "receipt number" printed under the group title, hashed from the group id. */
+function receiptNumber(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return String(hash % 10000).padStart(4, '0');
+}
+
 /**
- * One-glance group position: total spent, how much is still unsettled across
- * the group (sum of what creditors are owed), and where you stand. Tapping it
- * jumps to the Balances tab.
+ * The group's wallet: total spent, how much is still unsettled across the
+ * group (sum of what creditors are owed), and where you personally stand.
  */
-function GroupSummary({
+function WalletSummary({
   expenses,
   payments,
   members,
   me,
-  onShowBalances,
 }: {
   expenses: ExpenseRecord[];
   payments: PaymentRecord[];
   members: MemberRecord[];
   me: string;
-  onShowBalances: () => void;
 }) {
   const totalSpent = expenses.reduce((a, e) => a + e.amount_cents, 0);
   const nets = computeNets(
@@ -204,29 +204,37 @@ function GroupSummary({
   const unsettled = units.reduce((a, u) => a + Math.max(0, u.cents), 0);
   const myUnit = units.find(u => u.memberIds.includes(me));
   const mine = myUnit?.cents ?? 0;
-  // If you're in a party, your position is your wallet's — labeled by its name.
-  const label =
+  // If you're in a party, the wallet is shared — label it by the party's name.
+  const partySuffix =
     myUnit && myUnit.memberIds.length > 1
-      ? partyDisplayName(members.filter(m => myUnit.memberIds.includes(m.id)))
-      : 'You';
+      ? ` · ${partyDisplayName(members.filter(m => myUnit.memberIds.includes(m.id)))}`
+      : '';
   return (
-    <button class="summary-strip" onClick={onShowBalances} title="See balances">
-      <span class="stat">
-        <span>Total spent</span>
-        <b>{formatCents(totalSpent)}</b>
-      </span>
-      <span class="stat">
-        <span>Unsettled</span>
-        <b>{formatCents(unsettled)}</b>
-      </span>
-      <span class="stat">
-        <span>{label}</span>
-        <b class={mine > 0 ? 'pos' : mine < 0 ? 'neg' : ''}>
-          {mine === 0 ? 'settled ✓' : mine > 0 ? `get ${formatCents(mine)}` : `owe ${formatCents(-mine)}`}
-        </b>
-      </span>
-    </button>
+    <>
+      <div class="wallet-summary">
+        <div class="subline">Your running balance{partySuffix}</div>
+        <span class={`stamp big ${mine < 0 ? 'red' : ''}`}>
+          {mine === 0 ? "You're settled up" : mine > 0 ? `You're owed ${formatCents(mine)}` : `You owe ${formatCents(-mine)}`}
+        </span>
+        <div class="wallet-stats">
+          <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{formatCents(totalSpent)}</span></div>
+          <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{formatCents(unsettled)}</span></div>
+        </div>
+      </div>
+      <hr class="rule" />
+    </>
   );
+}
+
+/** What this expense did to `me`'s balance: what I paid in, minus what I owe of it. */
+function myDelta(e: ExpenseRecord, me: string): number {
+  const paid = e.payers?.length
+    ? (e.payers.find(p => p.member === me)?.cents ?? 0)
+    : e.paid_by === me
+      ? e.amount_cents
+      : 0;
+  const owed = e.split.entries.find(en => en.member === me)?.cents ?? 0;
+  return paid - owed;
 }
 
 function ExpenseList({
@@ -235,12 +243,14 @@ function ExpenseList({
   memberCount,
   groupId,
   token,
+  me,
 }: {
   expenses: ExpenseRecord[];
   memberById: Map<string, { name: string }>;
   memberCount: number;
   groupId: string;
   token: string;
+  me: string;
 }) {
   if (expenses.length === 0) {
     return <p class="hint">No expenses yet. Tap + to add the first one.</p>;
@@ -254,21 +264,41 @@ function ExpenseList({
     return ids.length <= 3 ? ids.map(nameOf).join(', ') : `${ids.length} people`;
   };
   return (
-    <ul class="expense-list">
-      {expenses.map(e => (
-        <li key={e.id}>
-          <button class="expense-row" onClick={() => navigate(groupPath(groupId, token, `/e/${e.id}`))}>
-            <div class="expense-main">
-              <span class="expense-desc">{e.description}</span>
-              <span class="expense-meta">
-                {payerNames(e)} paid for {participants(e)} · {e.date.slice(0, 10)}
-              </span>
-            </div>
-            <span class="expense-amount">{formatCents(e.amount_cents)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul class="expense-list">
+        {expenses.map((e, i) => {
+          const delta = myDelta(e, me);
+          const people = e.split.entries.map(en => ({
+            id: en.member,
+            initials: personInitial(nameOf(en.member)),
+            color: colorForId(en.member),
+          }));
+          return (
+            <li key={e.id}>
+              {i > 0 && <hr class="rule" />}
+              <button class="row-btn expense-row" onClick={() => navigate(groupPath(groupId, token, `/e/${e.id}`))}>
+                <AvatarStack people={people} />
+                <div class="expense-main">
+                  <span class="expense-desc">{e.description}</span>
+                  <span class="expense-meta">
+                    {payerNames(e)} paid · split {e.split.entries.length} ways ({participants(e)}) · {e.date.slice(0, 10)}
+                  </span>
+                </div>
+                <span class="expense-amount-col">
+                  <span class="expense-amount num">{formatCents(e.amount_cents)}</span>
+                  {delta !== 0 && (
+                    <span class={`expense-delta num ${delta > 0 ? 'pos' : 'neg'}`}>
+                      {delta > 0 ? '+' : '-'}{formatCents(Math.abs(delta))} you
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <hr class="rule" />
+    </>
   );
 }
 
@@ -306,10 +336,11 @@ function JoinScreen({
         <h1>{group.name}</h1>
         <p class="tagline">Who are you?</p>
       </header>
-      <section class="card">
+      <section class="ticket-box">
         <div class="chip-row wrap">
           {members.map(m => (
-            <button key={m.id} class="chip lg" onClick={() => onJoined(m.id)}>
+            <button key={m.id} class="chip lg with-avatar" onClick={() => onJoined(m.id)}>
+              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} />
               {m.name}
             </button>
           ))}
@@ -327,7 +358,7 @@ function JoinScreen({
         </div>
         {error && <p class="error">{error}</p>}
       </section>
-      <p class="hint">
+      <p class="hint sans">
         No password, no account — picking a name just makes adding expenses quicker.
       </p>
     </div>
