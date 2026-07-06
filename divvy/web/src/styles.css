@@ -243,8 +243,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .split-rows { display: flex; flex-direction: column; gap: 11px; }
 .split-row { display: flex; align-items: center; gap: 11px; }
 .split-name { flex: 1; font-weight: 700; font-size: 0.88rem; color: var(--ink); }
-.pct-input { display: flex; align-items: center; gap: 0.3rem; color: var(--faint); }
-.pct-input input { width: 4.5rem; text-align: right; padding: 0.35rem 0.5rem; }
+.pct-input { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 46px; color: var(--ink); }
+.pct-input input {
+  width: 2.4rem; text-align: right; padding: 0 2px; border: none; background: none;
+  font-weight: 700; font-size: 1rem; color: var(--ink);
+}
+.pct-input input:focus { outline-offset: 1px; }
 .payer-input { display: flex; align-items: center; gap: 0.3rem; color: var(--faint); }
 .payer-input input { width: 5.5rem; text-align: right; padding: 0.35rem 0.5rem; }
 

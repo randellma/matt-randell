@@ -85,6 +85,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setPayersEdited(false);
   }
 
+  function stepPercent(id: string, delta: number) {
+    const current = parseFloat(percents[id] ?? '') || 0;
+    const next = Math.min(100, Math.max(0, current + delta));
+    setPercents({ ...percents, [id]: String(next) });
+  }
+
   function editPayerAmount(id: string, text: string) {
     setPayersEdited(true);
     const next = { ...payerAmounts, [id]: text };
@@ -329,16 +335,20 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               <div key={m.id} class="split-row">
                 <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
                 <span class="split-name">{m.name}</span>
-                <span class="pct-input">
-                  <input
-                    inputMode="decimal"
-                    value={percents[m.id] ?? ''}
-                    placeholder="0"
-                    onInput={e =>
-                      setPercents({ ...percents, [m.id]: (e.target as HTMLInputElement).value })
-                    }
-                  />
-                  %
+                <span class="stepper">
+                  <button onClick={() => stepPercent(m.id, -5)}>−</button>
+                  <span class="pct-input">
+                    <input
+                      inputMode="decimal"
+                      value={percents[m.id] ?? ''}
+                      placeholder="0"
+                      onInput={e =>
+                        setPercents({ ...percents, [m.id]: (e.target as HTMLInputElement).value })
+                      }
+                    />
+                    %
+                  </span>
+                  <button onClick={() => stepPercent(m.id, 5)}>+</button>
                 </span>
               </div>
             ))}
