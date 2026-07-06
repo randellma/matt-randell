@@ -49,9 +49,27 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homeserver" {
         hostname = "discount.mattrandell.com"
         service  = "http://localhost:3000"
       },
+      # Coolify apps behind Traefik route through its HTTPS entrypoint (443),
+      # not port 80 (Traefik redirects http->https, causing a loop with the
+      # tunnel) or 8080 (Traefik's dashboard/API, not app routing). Traefik
+      # picks the router by TLS SNI, so origin_server_name must be set to the
+      # real hostname (cloudflared otherwise sends "localhost" as SNI, which
+      # matches no router and the connection is just dropped -> bare 502).
       {
         hostname = "inventory-api.mattrandell.com"
-        service  = "http://localhost:8080"
+        service  = "https://localhost:443"
+        origin_request = {
+          no_tls_verify      = true
+          origin_server_name = "inventory-api.mattrandell.com"
+        }
+      },
+      {
+        hostname = "divvy-api.mattrandell.com"
+        service  = "https://localhost:443"
+        origin_request = {
+          no_tls_verify      = true
+          origin_server_name = "divvy-api.mattrandell.com"
+        }
       },
       {
         service = "http_status:404"
