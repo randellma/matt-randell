@@ -333,19 +333,11 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           </label>
           <label class="field grow">
             <span>Date</span>
-            <span class="date-field">
-              <input
-                type="date"
-                value={date}
-                onInput={e => setDate((e.target as HTMLInputElement).value)}
-              />
-              <svg class="date-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-                <rect x="1.5" y="3" width="13" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3" />
-                <line x1="1.5" y1="6.3" x2="14.5" y2="6.3" stroke="currentColor" stroke-width="1.3" />
-                <line x1="4.5" y1="1.3" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.3" />
-                <line x1="11.5" y1="1.3" x2="11.5" y2="4" stroke="currentColor" stroke-width="1.3" />
-              </svg>
-            </span>
+            <input
+              type="date"
+              value={date}
+              onInput={e => setDate((e.target as HTMLInputElement).value)}
+            />
           </label>
         </div>
         <div class="field" style="margin-top:14px;">
