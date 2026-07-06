@@ -4,7 +4,7 @@ import preact from '@preact/preset-vite';
 export default defineConfig({
   plugins: [preact()],
   server: {
-    port: 5174,
+    port: Number(process.env.PORT) || 5174,
   },
   build: {
     outDir: 'dist',
