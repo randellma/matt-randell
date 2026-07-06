@@ -166,6 +166,21 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     }
   }, [amountCents, mode, participants, percents, shares, items, members]);
 
+  // Percent mode's "who owes what" stays visible even while the percentages
+  // don't add to 100 — it just shows what each literal percentage works out
+  // to (so the totals visibly won't add up until it's fixed), rather than
+  // vanishing behind the "needs 100%" message like `preview` would.
+  const percentDisplayEntries = useMemo<SplitEntry[] | null>(() => {
+    if (mode !== 'percent' || amountCents === null || amountCents <= 0) return null;
+    const parts = members
+      .map(m => ({ member: m.id, percent: parseFloat(percents[m.id] ?? '') || 0 }))
+      .filter(p => p.percent > 0);
+    if (parts.length === 0) return null;
+    return parts.map(p => ({ member: p.member, cents: Math.round((amountCents * p.percent) / 100) }));
+  }, [mode, amountCents, percents, members]);
+
+  const owesEntries = mode === 'percent' ? percentDisplayEntries : (preview.entries ?? null);
+
   async function scanReceipt(file: File) {
     setScanState('working');
     setError('');
@@ -387,7 +402,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                 </button>
               </div>
             ))}
-            <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
               <PercentSum percents={percents} members={members} />
               <button class="btn small" onClick={resetPercents}>Reset</button>
             </div>
@@ -431,10 +446,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
       <div>
         <div class="seclbl left">Who owes what</div>
-        {preview.entries ? (
+        {owesEntries ? (
           <ul class="preview-list" style="margin-top:11px;">
             {(() => {
-              const entries = preview.entries!;
+              const entries = owesEntries!;
               const maxCents = Math.max(1, ...entries.map(e => e.cents));
               return entries.map(e => (
                 <li key={e.member}>
@@ -560,9 +575,9 @@ function PercentSum({ percents, members }: { percents: Record<string, string>; m
   const sum = members.reduce((a, m) => a + (parseFloat(percents[m.id] ?? '') || 0), 0);
   const ok = Math.abs(sum - 100) <= 0.01;
   return (
-    <p class={ok ? 'hint ok' : 'hint warn'}>
-      Total: {Number(sum.toFixed(2))}% {ok ? '✓' : '(needs to be 100%)'}
-    </p>
+    <div class={`pct-sum${ok ? '' : ' muted'}`}>
+      Total {Number(sum.toFixed(2))}% — {ok ? 'ok' : 'needs 100%'}
+    </div>
   );
 }
 

@@ -249,6 +249,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   font-weight: 700; font-size: 1rem; color: var(--ink);
 }
 .pct-input input:focus { outline-offset: 1px; }
+.pct-sum { text-align: right; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 2px; color: var(--ink); }
+.pct-sum.muted { color: var(--faint); }
 .payer-input { display: flex; align-items: center; gap: 0.3rem; color: var(--faint); }
 .payer-input input { width: 5.5rem; text-align: right; padding: 0.35rem 0.5rem; }
 
