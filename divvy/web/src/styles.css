@@ -51,10 +51,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   background-image:
     repeating-linear-gradient(0deg, rgba(32, 38, 31, 0.028) 0 1px, transparent 1px 26px),
     radial-gradient(circle at 50% -8%, rgba(0, 0, 0, 0.05), transparent 42%);
-  box-shadow:
-    0 30px 70px -30px rgba(0, 0, 0, 0.6),
-    inset 0 10px 16px -16px rgba(0, 0, 0, 0.22),
-    inset 0 -10px 16px -16px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.6);
   padding: max(26px, env(safe-area-inset-top)) 20px calc(5.5rem + env(safe-area-inset-bottom));
   min-height: 100dvh;
   display: flex;
