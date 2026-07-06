@@ -55,7 +55,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
     0 30px 70px -30px rgba(0, 0, 0, 0.6),
     inset 0 12px 20px -18px rgba(0, 0, 0, 0.4),
     inset 0 -12px 20px -18px rgba(0, 0, 0, 0.4);
-  padding: 26px 20px calc(5.5rem + env(safe-area-inset-bottom));
+  padding: max(26px, env(safe-area-inset-top)) 20px calc(5.5rem + env(safe-area-inset-bottom));
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -95,6 +95,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .seclbl::before, .seclbl::after { content: ''; flex: 1; border-top: 1.5px dashed var(--line); }
 .seclbl.left::before { display: none; }
+.seclbl.muted { color: var(--faint); }
 
 /* ticket box — for ad hoc forms/sections the source design doesn't depict */
 .ticket-box {
@@ -262,6 +263,13 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .stepper button:active { background: var(--ink); color: var(--paper); }
 .stepper b { min-width: 46px; text-align: center; font-weight: 700; font-size: 1rem; color: var(--ink); }
+
+.pct-remove {
+  width: 32px; height: 32px; flex: none; border: 1.8px solid var(--line); border-radius: 4px;
+  background: var(--paper); color: var(--faint); font-size: 1.1rem; display: flex; align-items: center;
+  justify-content: center; line-height: 1; font-family: 'Space Mono', monospace; transition: 0.1s;
+}
+.pct-remove:active { background: var(--paper2); }
 
 /* item editor (Receipt split mode) */
 .item-editor { display: flex; flex-direction: column; gap: 11px; }

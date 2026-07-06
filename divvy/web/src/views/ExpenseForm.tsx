@@ -111,6 +111,19 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setPercents(next);
   }
 
+  // Bring someone back into the percent split, re-splitting 100% evenly
+  // across them plus whoever was already in.
+  function addBackToPercent(id: string) {
+    const activeIds = [
+      ...members.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0).map(m => m.id),
+      id,
+    ];
+    const shares = allocate(100, activeIds.map(() => 1));
+    const next = { ...percents };
+    activeIds.forEach((mid, i) => { next[mid] = String(shares[i]); });
+    setPercents(next);
+  }
+
   // Undo any removals/manual tweaks — back to an even split across everyone.
   function resetPercents() {
     const even = allocate(100, members.map(() => 1));
@@ -372,42 +385,55 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           </div>
         )}
 
-        {mode === 'percent' && (
-          <div class="split-rows" style="margin-top:13px;">
-            {members.map(m => (
-              <div key={m.id} class="split-row">
-                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
-                <span class="split-name">{m.name}</span>
-                <span class="stepper">
-                  <button onClick={() => stepPercent(m.id, -5)}>−</button>
-                  <span class="pct-input">
-                    <input
-                      inputMode="decimal"
-                      value={percents[m.id] ?? ''}
-                      placeholder="0"
-                      onInput={e =>
-                        setPercents({ ...percents, [m.id]: (e.target as HTMLInputElement).value })
-                      }
-                    />
-                    %
+        {mode === 'percent' && (() => {
+          const inSplit = members.filter(m => (parseFloat(percents[m.id] ?? '') || 0) > 0);
+          const removed = members.filter(m => (parseFloat(percents[m.id] ?? '') || 0) <= 0);
+          return (
+            <div class="split-rows" style="margin-top:13px;">
+              {inSplit.map(m => (
+                <div key={m.id} class="split-row">
+                  <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
+                  <span class="split-name">{m.name}</span>
+                  <span class="stepper">
+                    <button onClick={() => stepPercent(m.id, -5)}>−</button>
+                    <span class="pct-input">
+                      <input
+                        inputMode="decimal"
+                        value={percents[m.id] ?? ''}
+                        placeholder="0"
+                        onInput={e =>
+                          setPercents({ ...percents, [m.id]: (e.target as HTMLInputElement).value })
+                        }
+                      />
+                      %
+                    </span>
+                    <button onClick={() => stepPercent(m.id, 5)}>+</button>
                   </span>
-                  <button onClick={() => stepPercent(m.id, 5)}>+</button>
-                </span>
-                <button
-                  class="item-remove"
-                  title={`Remove ${m.name}`}
-                  onClick={() => removeFromPercent(m.id)}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
+                  <button class="pct-remove" title={`Remove ${m.name}`} onClick={() => removeFromPercent(m.id)}>
+                    ×
+                  </button>
+                </div>
+              ))}
               <PercentSum percents={percents} members={members} />
-              <button class="btn small" onClick={resetPercents}>Reset</button>
+
+              {removed.length > 0 && (
+                <>
+                  <div class="seclbl left muted">Removed · tap to add back</div>
+                  <div class="chip-row wrap">
+                    {removed.map(m => (
+                      <button key={m.id} class="chip ghost with-avatar" onClick={() => addBackToPercent(m.id)}>
+                        <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={24} />
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button class="btn" onClick={resetPercents}>↺ Reset to equal split</button>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {mode === 'shares' && (
           <div class="split-rows" style="margin-top:13px;">
