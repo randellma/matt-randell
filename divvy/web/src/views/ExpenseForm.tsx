@@ -111,6 +111,14 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setPercents(next);
   }
 
+  // Undo any removals/manual tweaks — back to an even split across everyone.
+  function resetPercents() {
+    const even = allocate(100, members.map(() => 1));
+    const next: Record<string, string> = {};
+    members.forEach((m, i) => { next[m.id] = String(even[i]); });
+    setPercents(next);
+  }
+
   function editPayerAmount(id: string, text: string) {
     setPayersEdited(true);
     const next = { ...payerAmounts, [id]: text };
@@ -379,7 +387,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                 </button>
               </div>
             ))}
-            <PercentSum percents={percents} members={members} />
+            <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+              <PercentSum percents={percents} members={members} />
+              <button class="btn small" onClick={resetPercents}>Reset</button>
+            </div>
           </div>
         )}
 
