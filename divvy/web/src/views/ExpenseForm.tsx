@@ -2,7 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, SplitData } from '../api';
-import { allocateEven, formatCents, parseAmount } from '../lib/money';
+import { allocate, allocateEven, formatCents, parseAmount } from '../lib/money';
 import { groupParties, partyDisplayName } from '../lib/party';
 import { computeEven, computePercent, computeShares, type SplitEntry, type SplitMode } from '../lib/split';
 import { computeItemized, type AssignedItem } from '../lib/receipt';
@@ -59,6 +59,9 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     const init: Record<string, string> = {};
     if (expense?.split.percents) {
       for (const [k, v] of Object.entries(expense.split.percents)) init[k] = String(v);
+    } else {
+      const even = allocate(100, members.map(() => 1));
+      members.forEach((m, i) => { init[m.id] = String(even[i]); });
     }
     return init;
   });
@@ -87,7 +90,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
   function stepPercent(id: string, delta: number) {
     const current = parseFloat(percents[id] ?? '') || 0;
-    const next = Math.min(100, Math.max(0, current + delta));
+    // If we're not already on a multiple of 5 (e.g. a fresh even split like 33/33/34),
+    // the first tap snaps to the nearest multiple of 5 in the direction pressed;
+    // every tap after that just moves by 5.
+    const onGrid = current % 5 === 0;
+    const snapped = delta > 0 ? Math.ceil(current / 5) * 5 : Math.floor(current / 5) * 5;
+    const next = Math.min(100, Math.max(0, onGrid ? current + delta : snapped));
     setPercents({ ...percents, [id]: String(next) });
   }
 
