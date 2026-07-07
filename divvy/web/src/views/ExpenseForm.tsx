@@ -382,16 +382,16 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         </label>
         <div class="field-row" style="margin-top:13px;">
           <label class="field grow">
-            <span>Amount</span>
-            <span class="amount-wrap">
+            <span class="field-head">
+              Amount
               <CurrencySelect compact value={currency} onChange={changeCurrency} />
-              <input
-                inputMode="decimal"
-                value={amountText}
-                placeholder={moneyPlaceholder(currency)}
-                onInput={e => setAmountText((e.target as HTMLInputElement).value)}
-              />
             </span>
+            <input
+              inputMode="decimal"
+              value={amountText}
+              placeholder={moneyPlaceholder(currency)}
+              onInput={e => setAmountText((e.target as HTMLInputElement).value)}
+            />
           </label>
           <label class="field grow date">
             <span>Date</span>

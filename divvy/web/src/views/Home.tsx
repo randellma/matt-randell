@@ -266,7 +266,7 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
       {memberNames.length > 0 && (
         <div class="field">
           <span>Which one is you?</span>
-          <div class="chip-row">
+          <div class="chip-row wrap">
             {memberNames.map(n => (
               <button
                 key={n}
