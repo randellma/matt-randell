@@ -1,4 +1,5 @@
-// Renders the per-group link-preview image (/og/g/:id/:t/card.png): the
+// Renders the per-group link-preview image (/og/g/:id/:t/card.png — or
+// /og/g/:id/card.png for PIN-gated groups, whose links carry no token): the
 // receipt card from og/card.js with the group's avatar composited in as a
 // polaroid, rasterized with resvg's wasm build. functions/g/[[route]].js
 // points og:image here when the group has a photo; any failure falls back to
@@ -25,12 +26,17 @@ function toBase64(bytes) {
 
 async function renderCard(pbUrl, id, t) {
   const signal = AbortSignal.timeout(4000);
+  // Without a token (PIN-gated group) the security route reveals name+photo;
+  // with one, read the record like the app does.
   const groupRes = await fetch(
-    `${pbUrl}/api/collections/groups/records/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`,
+    t
+      ? `${pbUrl}/api/collections/groups/records/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`
+      : `${pbUrl}/api/divvy/groups/${encodeURIComponent(id)}/security`,
     { signal },
   );
   if (!groupRes.ok) return null;
   const group = await groupRes.json();
+  if (!t && !group.pin) return null;
   if (!group.photo) return null;
 
   const photoRes = await fetch(
@@ -54,9 +60,12 @@ export async function onRequestGet({ request, env, params, waitUntil }) {
   const cached = await cache.match(request);
   if (cached) return cached;
 
-  const [id, t] = params.route ?? [];
+  // Route tail is [id, t, 'card.png'] or, token-less, [id, 'card.png'].
+  const parts = params.route ?? [];
+  const id = parts[0];
+  const t = parts.length >= 3 ? parts[1] : null;
   let png = null;
-  if (id && t) {
+  if (id) {
     try {
       png = await renderCard(env.PB_URL || DEFAULT_PB_URL, id, t);
     } catch (e) {

@@ -12,6 +12,24 @@ export interface GroupRecord {
   expense_currency: string;
   /** avatar photo filename; '' = initials avatar */
   photo: string;
+  /** joining requires the group PIN; server-managed, read-only to clients */
+  pin_on: boolean;
+}
+
+/**
+ * What the custom security routes reveal about a group. Without a token only
+ * PIN-gated groups return anything beyond `pin: false`; with a valid `?t=`
+ * the recovery email and attempt count come along for the settings screen.
+ */
+export interface SecurityInfo {
+  pin: boolean;
+  locked?: boolean;
+  name?: string;
+  /** group avatar photo filename, for the join screen */
+  photo?: string;
+  has_recovery?: boolean;
+  recovery_email?: string;
+  attempts?: number;
 }
 
 export interface MemberRecord {
@@ -117,6 +135,11 @@ export class DivvyApi {
 
   groupPhotoUrl(g: GroupRecord): string | undefined {
     return g.photo ? this.fileUrl('groups', g.id, g.photo) : undefined;
+  }
+
+  /** Same, from the bare id+filename the security route returns pre-join. */
+  groupPhotoUrlById(groupId: string, filename: string): string {
+    return this.fileUrl('groups', groupId, filename);
   }
 
   memberPhotoUrl(m: MemberRecord): string | undefined {
@@ -293,6 +316,44 @@ export class DivvyApi {
 
   async getReceipt(id: string, t: string): Promise<ReceiptRecord> {
     return this.pb.collection('receipts').getOne(id, { query: { t } });
+  }
+
+  /** PIN/recovery state; pass the token to also get the settings-only fields. */
+  async securityInfo(groupId: string, t?: string): Promise<SecurityInfo> {
+    return this.pb.send(`/api/divvy/groups/${groupId}/security`, {
+      method: 'GET',
+      query: t ? { t } : {},
+    });
+  }
+
+  /** Trade a correct PIN for the group token. Throws with response codes
+   * `wrong_pin` (+ attempts_left) or `locked` — see PinGate. */
+  async joinWithPin(groupId: string, pin: string): Promise<{ t: string; name: string }> {
+    return this.pb.send(`/api/divvy/groups/${groupId}/join`, {
+      method: 'POST',
+      body: { pin },
+    });
+  }
+
+  /**
+   * Set/change/disable the PIN, set the recovery email, or unlock joining.
+   * Enabling the PIN rotates the token — the response's `t` is authoritative.
+   */
+  async updateSecurity(
+    groupId: string,
+    t: string,
+    changes: { pin?: string; disable_pin?: boolean; recovery_email?: string; unlock?: boolean },
+  ): Promise<{ t: string; pin: boolean; recovery_email: string; attempts: number }> {
+    return this.pb.send(`/api/divvy/groups/${groupId}/security`, {
+      method: 'POST',
+      body: changes,
+      query: { t },
+    });
+  }
+
+  /** Ask the server to email the group's access link to its recovery address. */
+  async requestRecovery(groupId: string): Promise<{ sent: boolean; to: string }> {
+    return this.pb.send(`/api/divvy/groups/${groupId}/recover`, { method: 'POST', body: {} });
   }
 
   async waitForReceipt(id: string, t: string, timeoutMs = 120000): Promise<ReceiptRecord> {

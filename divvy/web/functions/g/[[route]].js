@@ -1,4 +1,5 @@
-// Cloudflare Pages Function for path-form share links (/g/:id/:t).
+// Cloudflare Pages Function for path-form share links (/g/:id/:t — or the
+// token-less /g/:id that PIN-gated groups share).
 //
 // Messaging-app link crawlers don't run JS and never see a URL's #fragment,
 // so hash routes can't carry a preview. Share links therefore use this real
@@ -27,6 +28,17 @@ function memberBlurb(names) {
 
 async function fetchGroupPreview(pbUrl, id, t) {
   const signal = AbortSignal.timeout(3000);
+
+  // Token-less link: a PIN-gated group. The security route reveals just the
+  // name and photo (never the member list — that stays behind the PIN).
+  if (!t) {
+    const res = await fetch(`${pbUrl}/api/divvy/groups/${encodeURIComponent(id)}/security`, { signal });
+    if (!res.ok) return null;
+    const info = await res.json();
+    if (!info.pin) return null;
+    return { name: info.name, photo: info.photo, memberNames: [], pin: true };
+  }
+
   const query = `t=${encodeURIComponent(t)}`;
   const [groupRes, membersRes] = await Promise.all([
     fetch(`${pbUrl}/api/collections/groups/records/${encodeURIComponent(id)}?${query}`, { signal }),
@@ -38,7 +50,7 @@ async function fetchGroupPreview(pbUrl, id, t) {
   if (!groupRes.ok) return null;
   const group = await groupRes.json();
   const members = membersRes.ok ? (await membersRes.json()).items ?? [] : [];
-  return { name: group.name, photo: group.photo, memberNames: members.map((m) => m.name) };
+  return { name: group.name, photo: group.photo, memberNames: members.map((m) => m.name), pin: false };
 }
 
 /** Cache-buster for the dynamic card: changes when the photo or name does. */
@@ -53,7 +65,7 @@ async function cardVersion(preview) {
 export async function onRequestGet({ request, env, params }) {
   const shell = await env.ASSETS.fetch(new URL('/', request.url));
   const [id, t] = params.route ?? [];
-  if (!id || !t) return shell;
+  if (!id) return shell;
 
   let preview = null;
   try {
@@ -65,20 +77,24 @@ export async function onRequestGet({ request, env, params }) {
   if (!preview) return shell;
 
   const title = `Join “${preview.name}” on Divvy`;
-  const description =
-    memberBlurb(preview.memberNames) +
-    'Tap to see the group and add your expenses — no app, no sign-up.';
+  const description = preview.pin
+    ? 'Tap to open — you’ll need the group PIN to join. No app, no sign-up.'
+    : memberBlurb(preview.memberNames) +
+      'Tap to see the group and add your expenses — no app, no sign-up.';
   // Groups with a photo get a card with the avatar composited in (rendered by
   // functions/og/g/[[route]].js); the rest share the static branded card.
+  const ogPath = t
+    ? `/og/g/${encodeURIComponent(id)}/${encodeURIComponent(t)}/card.png`
+    : `/og/g/${encodeURIComponent(id)}/card.png`;
   const image = preview.photo
-    ? new URL(`/og/g/${encodeURIComponent(id)}/${encodeURIComponent(t)}/card.png?v=${await cardVersion(preview)}`, request.url).href
+    ? new URL(`${ogPath}?v=${await cardVersion(preview)}`, request.url).href
     : new URL('/og-card.png', request.url).href;
   const og = `
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Divvy" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
-  <meta property="og:url" content="${escapeHtml(new URL(request.url).origin + `/g/${id}/${t}`)}" />
+  <meta property="og:url" content="${escapeHtml(new URL(request.url).origin + (t ? `/g/${id}/${t}` : `/g/${id}`))}" />
   <meta property="og:image" content="${escapeHtml(image)}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />

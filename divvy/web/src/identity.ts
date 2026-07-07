@@ -44,8 +44,10 @@ export function newToken(): string {
  * Pull a group id + token out of a pasted share link (or the bare `/g/id/token`
  * tail). Membership lives in the link, so this is how a fresh context — a newly
  * installed PWA, another browser — gets to a group it never joined here.
+ * PIN-gated groups share token-less links (`/g/id`), so `t` may be absent:
+ * opening one lands on the PIN screen instead.
  */
-export function parseGroupLink(input: string): { id: string; t: string } | undefined {
-  const m = input.trim().match(/g\/([a-z0-9]+)\/([a-f0-9]+)/i);
-  return m ? { id: m[1]!, t: m[2]! } : undefined;
+export function parseGroupLink(input: string): { id: string; t?: string } | undefined {
+  const m = input.trim().match(/g\/([a-z0-9]+)(?:\/([a-f0-9]{20,}))?/i);
+  return m ? { id: m[1]!, t: m[2] } : undefined;
 }

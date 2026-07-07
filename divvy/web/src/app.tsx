@@ -13,18 +13,27 @@ export function navigate(path: string): void {
   location.hash = path;
 }
 
-// Share links use a real path (/g/:id/:t) so the server can inject a link
+// Share links use a real path (/g/:id/:t — or just /g/:id for PIN-gated
+// groups, whose links don't carry the token) so the server can inject a link
 // preview for that group (see functions/g/[[route]].js); the app itself lives
 // on hash routes. Normalize before mounting — also covers the offline case
 // where the service worker answers a path navigation with the cached shell.
 {
-  const m = location.pathname.match(/^\/g\/([^/]+)\/([^/]+)/);
-  if (m && !location.hash) history.replaceState(null, '', `/#/g/${m[1]}/${m[2]}`);
+  const m = location.pathname.match(/^\/g\/([^/]+)(?:\/([^/]+))?/);
+  if (m && !location.hash) {
+    history.replaceState(null, '', m[2] ? `/#/g/${m[1]}/${m[2]}` : `/#/g/${m[1]}`);
+  }
 }
 
+/** With an empty token the route is token-less — PIN-gated groups live there
+ * so the credential never sits in the address bar. */
 export function groupPath(id: string, t: string, sub = ''): string {
-  return `#/g/${id}/${t}${sub}`;
+  return t ? `#/g/${id}/${t}${sub}` : `#/g/${id}${sub}`;
 }
+
+/** Tokens are long lowercase hex (newToken); route words like "settings",
+ * "new", or an expense id never match, so the two URL forms can't collide. */
+const TOKEN_RE = /^[a-f0-9]{20,}$/;
 
 function useHash(): string {
   const [hash, setHash] = useState(location.hash);
@@ -40,8 +49,16 @@ export function App() {
   const hash = useHash();
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 
-  if (parts[0] === 'g' && parts[1] && parts[2]) {
-    return <Group key={parts[1]} groupId={parts[1]} token={parts[2]} sub={parts.slice(3)} />;
+  if (parts[0] === 'g' && parts[1]) {
+    const hasToken = parts[2] !== undefined && TOKEN_RE.test(parts[2]);
+    return (
+      <Group
+        key={parts[1]}
+        groupId={parts[1]}
+        token={hasToken ? parts[2] : undefined}
+        sub={parts.slice(hasToken ? 3 : 2)}
+      />
+    );
   }
   return <Home />;
 }

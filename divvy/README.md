@@ -52,8 +52,11 @@ project, custom domain, and both DNS records are Terraform-managed
 1. In Coolify, create an app from this repo with build context `divvy/server/`
    (Dockerfile build).
 2. Add a persistent volume mounted at `/pb/pb_data`.
-3. Set env vars: `ANTHROPIC_API_KEY` (required for receipt OCR); optionally
-   `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`).
+3. Set env vars: `ANTHROPIC_API_KEY` (required for receipt OCR);
+   `RESEND_API_KEY` (required for PIN-recovery emails — see below); optionally
+   `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
+   (default `Divvy <divvy@mattrandell.com>`), and `DIVVY_APP_URL` (default
+   `https://divvy.mattrandell.com`).
 4. Expose port 8080 and add the `divvy-api.mattrandell.com` domain so Traefik
    routes it through the existing Cloudflare Tunnel.
 5. On first boot, migrations auto-apply. Create the superuser for the admin UI
@@ -68,3 +71,26 @@ localStorage and sends it as `?t=` on every request, and PocketBase collection
 rules verify it. Anyone with the link can read and write everything in that
 group — that's the product, not a bug. See
 [ADR-0001](docs/adr/0001-no-accounts-link-token-access.md).
+
+Optionally, a group can turn on a 4–6 digit **PIN** (Group settings → PIN &
+recovery). Its share link then carries only the group id, and new people must
+type the PIN to get the token; ten wrong tries lock joining until a member
+unlocks it. Enabling the PIN rotates the token, so links shared beforehand
+stop granting access (current members just re-enter with the PIN once). A
+recovery email address can be set per group — the join screen's "forgot the
+PIN?" button emails that address the group's access link. See
+[ADR-0003](docs/adr/0003-optional-group-pin.md).
+
+## Recovery emails (Resend)
+
+Recovery emails go out through [Resend](https://resend.com)'s HTTP API from a
+PocketBase hook — no SMTP setup. One-time setup:
+
+1. In the Resend dashboard, verify the sending domain (`mattrandell.com`) —
+   already done if another app sends from it — and create an API key
+   (sending-only, its own key per app is good hygiene).
+2. Set `RESEND_API_KEY` on the backend (Coolify env var, next to
+   `ANTHROPIC_API_KEY`). Without it, everything works except recovery emails,
+   which fail with a clear "not configured" message.
+3. Optionally set `DIVVY_EMAIL_FROM` — must be an address on the verified
+   domain.

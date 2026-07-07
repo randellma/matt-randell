@@ -151,6 +151,12 @@ function OpenGroup({ onCancel }: { onCancel: () => void }) {
   async function open() {
     const parsed = parseGroupLink(link);
     if (!parsed) return setError("That doesn't look like a Divvy group link.");
+    if (!parsed.t) {
+      // Token-less link — a PIN-gated group. The group screen shows the PIN
+      // gate and remembers the group once the PIN checks out.
+      navigate(groupPath(parsed.id, ''));
+      return;
+    }
     setBusy(true);
     setError('');
     try {

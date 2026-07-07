@@ -399,6 +399,9 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 
 .inline-add { display: flex; gap: 8px; }
 .inline-add input.price { width: 5.5rem; flex: none; }
+
+/* PIN entry — ticket-stub digits: monospace, spaced, centered */
+.pin-input { font-family: inherit; text-align: center; letter-spacing: 0.35em; font-size: 1.05rem; }
 .inline-add .btn { flex: none; }
 
 .divider { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }

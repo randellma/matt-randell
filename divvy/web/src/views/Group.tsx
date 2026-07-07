@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
-import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, SecurityInfo } from '../api';
 import { getJoinedGroup, rememberGroup } from '../identity';
+import { PinGate } from './PinGate';
 import {
   aggregateUnits,
   computeNets,
@@ -20,11 +21,12 @@ import { GroupSettings } from './GroupSettings';
 
 interface Props {
   groupId: string;
-  token: string;
+  /** token from the URL — absent on token-less routes (PIN-gated groups) */
+  token?: string;
   sub: string[];
 }
 
-export function Group({ groupId, token, sub }: Props) {
+export function Group({ groupId, token: urlToken, sub }: Props) {
   const [group, setGroup] = useState<GroupRecord | null>(null);
   const [members, setMembers] = useState<MemberRecord[] | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[] | null>(null);
@@ -33,14 +35,23 @@ export function Group({ groupId, token, sub }: Props) {
   const [tab, setTab] = useState<'expenses' | 'balances'>('expenses');
   const [me, setMe] = useState<string | undefined>(getJoinedGroup(groupId)?.memberId);
   const [shared, setShared] = useState(false);
+  // The working credential: from the URL on full links, from localStorage on
+  // token-less ones. Empty until the PIN gate hands one over.
+  const [token, setToken] = useState(urlToken ?? getJoinedGroup(groupId)?.t ?? '');
+  // Set when we hold no working token but the group takes a PIN — render the gate.
+  const [pinInfo, setPinInfo] = useState<SecurityInfo | null>(null);
+  // URL form for in-app navigation: keep the token in the URL only if it
+  // arrived there and still works; PIN-gated groups stay token-less so the
+  // credential never sits in the address bar.
+  const linkToken = urlToken === token ? token : '';
 
   const reload = useCallback(async () => {
-    try {
+    const load = async (tok: string) => {
       const [g, m, e, p] = await Promise.all([
-        api.getGroup(groupId, token),
-        api.listMembers(groupId, token),
-        api.listExpenses(groupId, token),
-        api.listPayments(groupId, token),
+        api.getGroup(groupId, tok),
+        api.listMembers(groupId, tok),
+        api.listExpenses(groupId, tok),
+        api.listPayments(groupId, tok),
       ]);
       setGroup(g);
       setMembers(m);
@@ -49,13 +60,40 @@ export function Group({ groupId, token, sub }: Props) {
       // A previous attempt may have failed (bad token, server down) — a
       // successful reload must clear the error or the screen stays stuck on it.
       setError('');
+      setPinInfo(null);
       // Opening a valid link is enough to belong here — remember it in this
       // context (PWA or browser) so it shows up on Home, keeping any identity
       // already picked. This is what carries a link-shared group across the
       // PWA/browser storage divide once you've opened it once.
       const existing = getJoinedGroup(groupId);
-      rememberGroup({ ...existing, id: g.id, t: token, name: g.name });
+      rememberGroup({ ...existing, id: g.id, t: tok, name: g.name });
+    };
+    try {
+      if (!token) throw new Error('no token yet');
+      await load(token);
     } catch (err) {
+      // The URL token may be stale (rotated when a PIN went on) while a newer
+      // one sits in localStorage — try that before giving up.
+      const stored = getJoinedGroup(groupId)?.t;
+      if (stored && stored !== token) {
+        try {
+          await load(stored);
+          setToken(stored);
+          return;
+        } catch {
+          /* fall through to the PIN probe */
+        }
+      }
+      // No working token. If the group is PIN-gated, the gate can get us in.
+      try {
+        const info = await api.securityInfo(groupId);
+        if (info.pin) {
+          setPinInfo(info);
+          return;
+        }
+      } catch {
+        /* server unreachable — the generic error below covers it */
+      }
       setError('Could not load this group. The link may be wrong or the server unreachable.');
       console.error(err);
     }
@@ -64,6 +102,27 @@ export function Group({ groupId, token, sub }: Props) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  if (pinInfo) {
+    return (
+      <PinGate
+        groupId={groupId}
+        info={pinInfo}
+        onJoined={t => {
+          rememberGroup({
+            ...getJoinedGroup(groupId),
+            id: groupId,
+            t,
+            name: pinInfo.name ?? '',
+          });
+          setPinInfo(null);
+          setToken(t);
+          // The URL may still carry the dead token — move to the token-less route.
+          if (urlToken) navigate(groupPath(groupId, '', sub.length ? `/${sub.join('/')}` : ''));
+        }}
+      />
+    );
+  }
 
   if (error) {
     return (
@@ -106,8 +165,15 @@ export function Group({ groupId, token, sub }: Props) {
           rememberGroup({ id: group.id, t: token, name: group.name, memberId });
           setMe(memberId);
         }}
+        onTokenRotated={t => {
+          // Turning the PIN on rotated the token: adopt it here and get the
+          // old one out of the address bar — this device stays signed in.
+          rememberGroup({ ...getJoinedGroup(groupId), id: group.id, t, name: group.name });
+          setToken(t);
+          navigate(groupPath(groupId, '', '/settings'));
+        }}
         onDone={changed => {
-          navigate(groupPath(groupId, token));
+          navigate(groupPath(groupId, linkToken));
           if (changed) reload();
         }}
       />
@@ -124,7 +190,7 @@ export function Group({ groupId, token, sub }: Props) {
         me={me!}
         expense={editing}
         onDone={() => {
-          navigate(groupPath(groupId, token));
+          navigate(groupPath(groupId, linkToken));
           reload();
         }}
       />
@@ -133,9 +199,18 @@ export function Group({ groupId, token, sub }: Props) {
 
   async function share() {
     // Path form (not the hash route) so the server can serve a per-group
-    // link-preview card to messaging-app crawlers.
-    const url = `${location.origin}/g/${group!.id}/${token}`;
-    const data = { title: `Divvy: ${group!.name}`, text: `Join our expense group "${group!.name}"`, url };
+    // link-preview card to messaging-app crawlers. PIN-gated groups share a
+    // token-less link — the PIN is the way in, not the URL.
+    const url = group!.pin_on
+      ? `${location.origin}/g/${group!.id}`
+      : `${location.origin}/g/${group!.id}/${token}`;
+    const data = {
+      title: `Divvy: ${group!.name}`,
+      text: group!.pin_on
+        ? `Join our expense group "${group!.name}" — you'll need the group PIN`
+        : `Join our expense group "${group!.name}"`,
+      url,
+    };
     if (navigator.share) {
       try {
         await navigator.share(data);
@@ -163,7 +238,7 @@ export function Group({ groupId, token, sub }: Props) {
             <button
               class="me-chip"
               title="Group settings"
-              onClick={() => navigate(groupPath(groupId, token, '/settings'))}
+              onClick={() => navigate(groupPath(groupId, linkToken, '/settings'))}
             >
               You: {memberById.get(me!)?.name} ·{' '}
               <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -208,7 +283,7 @@ export function Group({ groupId, token, sub }: Props) {
             memberById={memberById}
             memberCount={members.length}
             groupId={groupId}
-            token={token}
+            token={linkToken}
             me={me!}
           />
         </>
@@ -224,7 +299,7 @@ export function Group({ groupId, token, sub }: Props) {
         />
       )}
 
-      <button class="fab" onClick={() => navigate(groupPath(groupId, token, '/new'))} aria-label="Add expense">
+      <button class="fab" onClick={() => navigate(groupPath(groupId, linkToken, '/new'))} aria-label="Add expense">
         <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
         </svg>

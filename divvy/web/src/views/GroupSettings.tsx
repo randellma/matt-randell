@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { api, navigate } from '../app';
-import type { GroupRecord, MemberRecord } from '../api';
+import type { GroupRecord, MemberRecord, SecurityInfo } from '../api';
 import { convertMinor } from '../lib/currency';
 import { fetchRate } from '../lib/fx';
 import { prepareAvatarImage } from '../image';
@@ -18,6 +18,8 @@ interface Props {
   me: string;
   /** the user tapped a different member as "you" — local identity only */
   onMeChange: (memberId: string) => void;
+  /** turning the PIN on rotated the group token — adopt the new one */
+  onTokenRotated: (t: string) => void;
   /** back out, reloading group data if `changed` */
   onDone: (changed: boolean) => void;
 }
@@ -30,7 +32,7 @@ interface Props {
  * every expense's and payment's stored conversion at its own date — amounts
  * stay in their original currencies; only the group-level view moves.
  */
-export function GroupSettings({ group, token, members, me, onMeChange, onDone }: Props) {
+export function GroupSettings({ group, token, members, me, onMeChange, onTokenRotated, onDone }: Props) {
   // Local copies so photo/party edits show up without leaving the page; the
   // caller reloads on the way out whenever anything was mutated.
   const [grp, setGrp] = useState(group);
@@ -288,6 +290,17 @@ export function GroupSettings({ group, token, members, me, onMeChange, onDone }:
       <hr class="rule" />
 
       <PartyEditor members={mems} token={token} busy={busy} run={run} replaceMembers={replaceMembers} />
+      <hr class="rule" />
+
+      <SecuritySection
+        group={grp}
+        token={token}
+        onPinChanged={pinOn => {
+          mutated.current = true;
+          setGrp(g => ({ ...g, pin_on: pinOn }));
+        }}
+        onTokenRotated={onTokenRotated}
+      />
       <hr class="rule" />
 
       <div class="stack-sm">
@@ -627,6 +640,186 @@ function PartyEditor({
           onClose={() => setRenaming(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Optional group PIN + recovery email (ADR-0003). With the PIN on, share
+ * links carry only the group id and new people must type the PIN to get in;
+ * ten wrong tries lock joining. The recovery email is where the join screen's
+ * "forgot the PIN?" button sends the group's access link.
+ */
+function SecuritySection({
+  group,
+  token,
+  onPinChanged,
+  onTokenRotated,
+}: {
+  group: GroupRecord;
+  token: string;
+  onPinChanged: (pinOn: boolean) => void;
+  onTokenRotated: (t: string) => void;
+}) {
+  const [info, setInfo] = useState<SecurityInfo | null>(null);
+  const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    api
+      .securityInfo(group.id, token)
+      .then(i => {
+        setInfo(i);
+        setEmail(i.recovery_email ?? '');
+      })
+      .catch(() => setInfo({ pin: group.pin_on }));
+  }, [group.id, token]);
+
+  const pinOn = group.pin_on;
+  const pinValid = /^\d{4,6}$/.test(pin);
+  const emailDirty = email.trim() !== (info?.recovery_email ?? '');
+
+  async function apply(
+    changes: { pin?: string; disable_pin?: boolean; recovery_email?: string; unlock?: boolean },
+    note: string,
+  ) {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api.updateSecurity(group.id, token, changes);
+      setInfo({
+        pin: res.pin,
+        locked: false,
+        recovery_email: res.recovery_email,
+        attempts: res.attempts,
+      });
+      setEmail(res.recovery_email);
+      setPin('');
+      setNotice(note);
+      onPinChanged(res.pin);
+      if (res.t !== token) onTokenRotated(res.t);
+    } catch (e) {
+      const r = (e as { response?: { message?: string } }).response;
+      setError(r?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function enablePin() {
+    if (
+      !confirm(
+        `Turn on the PIN for "${group.name}"?\n\n` +
+          'The share link changes: links shared before now stop working, and ' +
+          'everyone currently in the group will be asked for the PIN once — ' +
+          'so tell them what it is.',
+      )
+    ) {
+      return;
+    }
+    apply({ pin }, 'PIN is on. Invite people with the share button and tell them the PIN.');
+  }
+
+  function disablePin() {
+    if (!confirm('Turn off the PIN?\n\nAnyone with the share link can join again, no PIN asked.')) return;
+    apply({ disable_pin: true }, 'PIN is off — the link alone is enough to join again.');
+  }
+
+  return (
+    <div class="stack-sm">
+      <div class="seclbl left">PIN &amp; recovery</div>
+      {!pinOn ? (
+        <>
+          <p class="hint sans left">
+            Right now anyone with the link is in. Add a 4–6 digit PIN and new
+            people must type it to join — the link alone stops being enough.
+          </p>
+          <div class="inline-add">
+            <input
+              class="pin-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="4–6 digits"
+              value={pin}
+              onInput={e => setPin((e.target as HTMLInputElement).value.replace(/\D/g, ''))}
+            />
+            <button class="btn" disabled={busy || !pinValid} onClick={enablePin}>
+              Turn on PIN
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p class="hint sans left">
+            PIN is on — new people need it to join. Ten wrong tries lock
+            joining until someone here unlocks it or changes the PIN.
+          </p>
+          {info?.locked && (
+            <>
+              <p class="error left">Joining is locked — too many wrong PIN attempts.</p>
+              <button class="btn" disabled={busy} onClick={() => apply({ unlock: true }, 'Joining unlocked.')}>
+                Unlock joining
+              </button>
+            </>
+          )}
+          <div class="inline-add">
+            <input
+              class="pin-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="New PIN"
+              value={pin}
+              onInput={e => setPin((e.target as HTMLInputElement).value.replace(/\D/g, ''))}
+            />
+            <button
+              class="btn"
+              disabled={busy || !pinValid}
+              onClick={() => apply({ pin }, 'PIN changed — tell the group.')}
+            >
+              Change PIN
+            </button>
+          </div>
+          <button class="btn" disabled={busy} onClick={disablePin}>
+            Turn off the PIN
+          </button>
+
+          <label class="field" style="margin-top:10px;">
+            <span>Recovery email</span>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onInput={e => setEmail((e.target as HTMLInputElement).value)}
+            />
+          </label>
+          <button
+            class="btn"
+            disabled={busy || !emailDirty}
+            onClick={() =>
+              apply(
+                { recovery_email: email.trim() },
+                email.trim() ? 'Recovery email saved.' : 'Recovery email removed.',
+              )
+            }
+          >
+            Save recovery email
+          </button>
+          <p class="hint sans left">
+            If the PIN is forgotten or joining gets locked, the join screen can
+            email an access link to this address. Leave empty for none.
+          </p>
+        </>
+      )}
+      {notice && <p class="hint sans left">{notice}</p>}
+      {error && <p class="error">{error}</p>}
     </div>
   );
 }
