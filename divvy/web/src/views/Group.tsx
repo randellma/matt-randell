@@ -46,6 +46,9 @@ export function Group({ groupId, token, sub }: Props) {
       setMembers(m);
       setExpenses(e);
       setPayments(p);
+      // A previous attempt may have failed (bad token, server down) — a
+      // successful reload must clear the error or the screen stays stuck on it.
+      setError('');
       // Opening a valid link is enough to belong here — remember it in this
       // context (PWA or browser) so it shows up on Home, keeping any identity
       // already picked. This is what carries a link-shared group across the
