@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../app';
-import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, SplitData } from '../api';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, ReceiptRecord, SplitData } from '../api';
 import { allocate, allocateEven } from '../lib/money';
 import {
   allCurrencies,
@@ -90,6 +90,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   );
   const [items, setItems] = useState<AssignedItem[]>(expense?.split.items ?? []);
   const [receiptId, setReceiptId] = useState(expense?.receipt ?? '');
+  // The attached receipt's record (for its image URL). Loaded lazily when
+  // editing an expense that already has one; set directly on upload/scan.
+  const [receiptRec, setReceiptRec] = useState<ReceiptRecord | null>(null);
+  const [receiptGone, setReceiptGone] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [attachState, setAttachState] = useState<'idle' | 'working'>('idle');
   const [scanState, setScanState] = useState<'idle' | 'working'>('idle');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -130,6 +136,47 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   function leave() {
     if (dirty && !confirm('Discard unsaved changes to this expense?')) return;
     onDone();
+  }
+
+  // Editing an expense that already has a receipt: fetch its record so we
+  // can show the image. If it's gone (old data), say so instead of spinning.
+  useEffect(() => {
+    if (!expense?.receipt) return;
+    let cancelled = false;
+    api.getReceipt(expense.receipt, token).then(
+      r => { if (!cancelled) setReceiptRec(r); },
+      () => { if (!cancelled) setReceiptGone(true); },
+    );
+    return () => { cancelled = true; };
+  }, [expense?.receipt, token]);
+
+  useEffect(() => {
+    if (!receiptOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setReceiptOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [receiptOpen]);
+
+  async function attachReceipt(file: File) {
+    setAttachState('working');
+    setError('');
+    try {
+      const image = await prepareReceiptImage(file);
+      const rec = await api.uploadReceiptImage(group.id, image, token);
+      setReceiptRec(rec);
+      setReceiptGone(false);
+      setReceiptId(rec.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAttachState('idle');
+    }
+  }
+
+  function detachReceipt() {
+    setReceiptId('');
+    setReceiptRec(null);
+    setReceiptGone(false);
   }
 
   useEffect(() => {
@@ -286,6 +333,8 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       const parsed = receipt.parsed;
       setItems(parsed.items.map(i => ({ label: i.label, cents: i.cents, assignees: [] })));
       setReceiptId(receipt.id);
+      setReceiptRec(receipt);
+      setReceiptGone(false);
       const itemSum = parsed.items.reduce((a, i) => a + i.cents, 0);
       const total = parsed.total_cents ?? itemSum + (parsed.tax_cents ?? 0) + (parsed.tip_cents ?? 0);
       setAmountText((total / 100).toFixed(2));
@@ -473,6 +522,43 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} currency={currency} />
           </div>
         )}
+        <div class="field" style="margin-top:14px;">
+          <span>Receipt</span>
+          {receiptId ? (
+            <div class="receipt-row">
+              {receiptRec ? (
+                <>
+                  <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
+                    <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
+                  </button>
+                  <span class="receipt-note">Tap to view</span>
+                </>
+              ) : (
+                <span class="receipt-note">{receiptGone ? 'Receipt image unavailable' : 'Loading receipt…'}</span>
+              )}
+              <button class="pct-remove" title="Remove receipt" onClick={detachReceipt}>×</button>
+            </div>
+          ) : attachState === 'working' ? (
+            <div class="scan-status"><div class="spinner" /> Uploading…</div>
+          ) : (
+            <label class="btn small attach-btn">
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              Attach photo
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={e => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) attachReceipt(file);
+                  (e.target as HTMLInputElement).value = '';
+                }}
+              />
+            </label>
+          )}
+        </div>
       </div>
       <hr class="rule" />
 
@@ -615,7 +701,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
       {error && <p class="error">{error}</p>}
 
-      <button class="btn primary big" onClick={save} disabled={busy || scanState === 'working'}>
+      <button class="btn primary big" onClick={save} disabled={busy || scanState === 'working' || attachState === 'working'}>
         {busy
           ? 'Saving…'
           : `${expense ? 'Save changes' : 'Add expense'}${amountCents !== null && amountCents > 0 ? ` · ${formatMoney(amountCents, currency)}` : ''}`}
@@ -623,6 +709,13 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       <hr class="rule" style="margin-top:8px;" />
       <div class="barcode" />
       <div class="barnum">DIVVY · {date.slice(5, 7)}/{date.slice(8, 10)}/{date.slice(0, 4)}</div>
+
+      {receiptOpen && receiptRec && (
+        <div class="lightbox" onClick={() => setReceiptOpen(false)}>
+          <img src={api.receiptImageUrl(receiptRec)} alt="Receipt" />
+          <button class="lightbox-close" aria-label="Close">×</button>
+        </div>
+      )}
     </div>
   );
 }

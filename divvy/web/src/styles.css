@@ -366,6 +366,37 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 .totals-line { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
 .totals-line .li.warn .amt { color: #B4692A; }
 
+/* attached receipt photo — a snapshot clipped onto the expense */
+.receipt-row { display: flex; align-items: center; gap: 12px; }
+.receipt-thumb {
+  flex: none; padding: 4px; background: #fff; border: 1px solid var(--line); border-radius: 2px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.22); transform: rotate(-2deg); cursor: zoom-in; transition: 0.12s;
+}
+.receipt-thumb:active { transform: rotate(0deg) scale(1.03); }
+.receipt-thumb img { display: block; height: 56px; max-width: 84px; object-fit: cover; }
+.receipt-note { flex: 1; text-align: left; font-size: 0.72rem; color: var(--faint); letter-spacing: 0.05em; }
+.attach-btn { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; color: var(--faint); border-color: var(--line); }
+.attach-btn:active { color: var(--ink); }
+/* paperclip in an expense row's meta line */
+.meta-clip { vertical-align: -1.5px; }
+
+/* full-screen receipt viewer */
+.lightbox {
+  position: fixed; inset: 0; z-index: 30; background: rgba(11, 18, 13, 0.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  cursor: zoom-out; animation: fade-in 0.15s ease-out;
+}
+.lightbox img {
+  max-width: 100%; max-height: 100%; background: #fff; padding: 5px; border-radius: 2px;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7);
+}
+.lightbox-close {
+  position: absolute; top: max(10px, env(safe-area-inset-top)); right: 14px;
+  color: rgba(255, 255, 255, 0.85); font-size: 1.9rem; line-height: 1; padding: 6px 10px;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
 .inline-add { display: flex; gap: 8px; }
 .inline-add input.price { width: 5.5rem; flex: none; }
 .inline-add .btn { flex: none; }

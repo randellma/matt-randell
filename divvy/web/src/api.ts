@@ -105,8 +105,14 @@ export class DivvyApi {
    * anyone holding the URL — filenames are random, and the group is
    * link-access anyway (same stance as receipt images).
    */
-  private fileUrl(collection: 'groups' | 'members', recordId: string, filename: string): string {
-    return `${this.base}/api/files/${collection}/${recordId}/${encodeURIComponent(filename)}`;
+  private fileUrl(
+    collection: 'groups' | 'members' | 'receipts',
+    recordId: string,
+    filename: string,
+    thumb?: string,
+  ): string {
+    const url = `${this.base}/api/files/${collection}/${recordId}/${encodeURIComponent(filename)}`;
+    return thumb ? `${url}?thumb=${thumb}` : url;
   }
 
   groupPhotoUrl(g: GroupRecord): string | undefined {
@@ -121,6 +127,11 @@ export class DivvyApi {
   partyPhotoUrl(partyMembers: MemberRecord[]): string | undefined {
     const holder = partyMembers.find(m => m.party_photo);
     return holder ? this.fileUrl('members', holder.id, holder.party_photo) : undefined;
+  }
+
+  /** URL for a receipt image; pass `thumb` (e.g. '0x200') for the small preview. */
+  receiptImageUrl(r: ReceiptRecord, thumb?: string): string | undefined {
+    return r.image ? this.fileUrl('receipts', r.id, r.image, thumb) : undefined;
   }
 
   async createGroup(
@@ -263,6 +274,19 @@ export class DivvyApi {
     const form = new FormData();
     form.set('group', groupId);
     form.set('status', 'pending');
+    form.set('image', image, 'receipt.jpg');
+    return this.pb.collection('receipts').create(form, { query: { t } });
+  }
+
+  /**
+   * Upload a receipt image as a plain attachment, skipping OCR: the server
+   * hook only parses records created with status 'pending', so starting at
+   * 'done' stores the photo and nothing else.
+   */
+  async uploadReceiptImage(groupId: string, image: Blob, t: string): Promise<ReceiptRecord> {
+    const form = new FormData();
+    form.set('group', groupId);
+    form.set('status', 'done');
     form.set('image', image, 'receipt.jpg');
     return this.pb.collection('receipts').create(form, { query: { t } });
   }
