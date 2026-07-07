@@ -146,6 +146,11 @@ export class DivvyApi {
     return this.pb.collection('groups').update(id, data, { query: { t } });
   }
 
+  /** Delete a group; members, expenses, payments, and receipts cascade server-side. */
+  async deleteGroup(id: string, t: string): Promise<void> {
+    await this.pb.collection('groups').delete(id, { query: { t } });
+  }
+
   async listMembers(groupId: string, t: string): Promise<MemberRecord[]> {
     return this.pb.collection('members').getFullList({
       filter: this.pb.filter('group = {:g}', { g: groupId }),

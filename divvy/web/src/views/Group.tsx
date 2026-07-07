@@ -281,14 +281,20 @@ function WalletSummary({
   );
 }
 
-/** What this expense did to `me`'s balance (in group currency): paid in, minus owed. */
-function myDelta(e: ExpenseForBalance, me: string): number {
+/**
+ * What this expense did to your wallet's balance (in group currency): paid in,
+ * minus owed. `meIds` is you alone, or every member of your party — a couple
+ * settles as one, so their expense deltas aggregate the same way.
+ */
+function walletDelta(e: ExpenseForBalance, meIds: string[]): number {
   const paid = e.payers?.length
-    ? (e.payers.find(p => p.member === me)?.cents ?? 0)
-    : e.paidBy === me
+    ? e.payers.filter(p => meIds.includes(p.member)).reduce((a, p) => a + p.cents, 0)
+    : meIds.includes(e.paidBy)
       ? e.amountCents
       : 0;
-  const owed = e.entries.find(en => en.member === me)?.cents ?? 0;
+  const owed = e.entries
+    .filter(en => meIds.includes(en.member))
+    .reduce((a, en) => a + en.cents, 0);
   return paid - owed;
 }
 
@@ -312,6 +318,11 @@ function ExpenseList({
   if (expenses.length === 0) {
     return <p class="hint">No expenses yet. Tap + to add the first one.</p>;
   }
+  // "You" means your wallet: yourself, or your whole party if you're linked.
+  const myParty = memberById.get(me)?.party;
+  const meIds = myParty
+    ? [...memberById.values()].filter(m => m.party === myParty).map(m => m.id)
+    : [me];
   const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
   const payerNames = (e: ExpenseRecord) =>
     e.payers?.length ? e.payers.map(p => nameOf(p.member)).join(' & ') : nameOf(e.paid_by);
@@ -324,7 +335,7 @@ function ExpenseList({
     <>
       <ul class="expense-list">
         {expenses.map((e, i) => {
-          const delta = myDelta(expenseForBalance(e, groupCurrency), me);
+          const delta = walletDelta(expenseForBalance(e, groupCurrency), meIds);
           const currency = e.currency || groupCurrency;
           const people = e.split.entries.map(en => {
             const m = memberById.get(en.member);

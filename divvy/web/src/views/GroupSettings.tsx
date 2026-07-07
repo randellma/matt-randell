@@ -1,13 +1,13 @@
 import { useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { api } from '../app';
+import { api, navigate } from '../app';
 import type { GroupRecord, MemberRecord } from '../api';
 import { convertMinor } from '../lib/currency';
 import { fetchRate } from '../lib/fx';
 import { prepareAvatarImage } from '../image';
 import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
 import { groupParties, partyDisplayName } from '../lib/party';
-import { newToken } from '../identity';
+import { forgetGroup, newToken } from '../identity';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 
@@ -75,6 +75,34 @@ export function GroupSettings({ group, token, members, me, onMeChange, onDone }:
     run(async () => replaceMembers([await api.setMemberPhoto(m.id, await prepareAvatarImage(file), token)]));
   const clearMemberPhoto = (m: MemberRecord) =>
     run(async () => replaceMembers([await api.setMemberPhoto(m.id, null, token)]));
+
+  /** Just forget the group locally — the link still works if it resurfaces. */
+  function removeFromDevice() {
+    forgetGroup(grp.id);
+    navigate('/');
+  }
+
+  async function deleteGroup() {
+    if (
+      !confirm(
+        `Delete "${grp.name}" for everyone?\n\n` +
+          'All expenses, payments, and receipts go with it, and the link ' +
+          "stops working for everybody. This can't be undone.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api.deleteGroup(grp.id, token);
+      forgetGroup(grp.id);
+      navigate('/');
+    } catch (e) {
+      setError(String(e));
+      setBusy(false);
+    }
+  }
 
   async function save() {
     setError('');
@@ -246,35 +274,39 @@ export function GroupSettings({ group, token, members, me, onMeChange, onDone }:
       </button>
       <hr class="rule" />
 
-      <div class="stack-sm">
-        <div class="seclbl left">Member photos</div>
-        <p class="hint sans left">Tap an avatar to add or change a photo.</p>
-        {mems.map(m => (
-          <div key={m.id} class="party-row">
-            <PhotoInput busy={busy} onPick={f => pickMemberPhoto(m, f)}>
-              <Avatar
-                initials={personInitial(m.name)}
-                color={colorForId(m.id)}
-                size={34}
-                src={api.memberPhotoUrl(m)}
-              />
-            </PhotoInput>
-            <span class="row-name">{m.name}</span>
-            {m.photo ? (
-              <button class="item-remove" disabled={busy} title="Remove photo" onClick={() => clearMemberPhoto(m)}>
-                ✕
-              </button>
-            ) : (
-              <PhotoInput class="btn small" busy={busy} onPick={f => pickMemberPhoto(m, f)}>
-                Add photo
-              </PhotoInput>
-            )}
-          </div>
-        ))}
-      </div>
+      <MemberEditor
+        members={mems}
+        groupId={grp.id}
+        token={token}
+        busy={busy}
+        run={run}
+        replaceMembers={replaceMembers}
+        appendMember={m => setMems(ms => [...ms, m])}
+        pickPhoto={pickMemberPhoto}
+        clearPhoto={clearMemberPhoto}
+      />
       <hr class="rule" />
 
       <PartyEditor members={mems} token={token} busy={busy} run={run} replaceMembers={replaceMembers} />
+      <hr class="rule" />
+
+      <div class="stack-sm">
+        <div class="seclbl left">Leave or delete</div>
+        <button class="btn" disabled={busy} onClick={removeFromDevice}>
+          Remove from this device
+        </button>
+        <p class="hint sans left">
+          Takes the group off your Home list. Nothing is deleted — opening the
+          link brings it back.
+        </p>
+        <button class="btn danger" disabled={busy} onClick={deleteGroup}>
+          Delete group for everyone
+        </button>
+        <p class="hint sans left">
+          Erases the group with all its expenses, payments, and receipts. The
+          link stops working for everybody. No undo.
+        </p>
+      </div>
       <hr class="rule" />
 
       {progress && <p class="hint">{progress}</p>}
@@ -314,6 +346,148 @@ function PhotoInput({
         }}
       />
     </label>
+  );
+}
+
+/**
+ * The member roster: add people who aren't here to add themselves, rename
+ * anyone (expenses point at member ids, so history follows the new name),
+ * and manage member photos.
+ */
+function MemberEditor({
+  members,
+  groupId,
+  token,
+  busy,
+  run,
+  replaceMembers,
+  appendMember,
+  pickPhoto,
+  clearPhoto,
+}: {
+  members: MemberRecord[];
+  groupId: string;
+  token: string;
+  busy: boolean;
+  run: (action: () => Promise<void>) => void;
+  replaceMembers: (updated: MemberRecord[]) => void;
+  appendMember: (m: MemberRecord) => void;
+  pickPhoto: (m: MemberRecord, file: File) => void;
+  clearPhoto: (m: MemberRecord) => void;
+}) {
+  const [newName, setNewName] = useState('');
+  const [renaming, setRenaming] = useState<MemberRecord | null>(null);
+
+  function add() {
+    const name = newName.trim();
+    if (!name) return;
+    setNewName('');
+    run(async () => appendMember(await api.addMember(groupId, name, token)));
+  }
+
+  function saveName(m: MemberRecord, name: string) {
+    setRenaming(null);
+    if (!name || name === m.name) return;
+    run(async () => replaceMembers([await api.updateMember(m.id, { name }, token)]));
+  }
+
+  return (
+    <div class="stack-sm">
+      <div class="seclbl left">Members</div>
+      <p class="hint sans left">Tap the avatar for a photo, the name to rename.</p>
+      {members.map(m => (
+        <div key={m.id} class="party-row">
+          <PhotoInput busy={busy} onPick={f => pickPhoto(m, f)}>
+            <Avatar
+              initials={personInitial(m.name)}
+              color={colorForId(m.id)}
+              size={34}
+              src={api.memberPhotoUrl(m)}
+            />
+          </PhotoInput>
+          <button class="party-name" title="Rename" onClick={() => setRenaming(m)}>
+            <span>{m.name} ✏️</span>
+          </button>
+          {m.photo ? (
+            <button class="item-remove" disabled={busy} title="Remove photo" onClick={() => clearPhoto(m)}>
+              ✕
+            </button>
+          ) : (
+            <PhotoInput class="btn small" busy={busy} onPick={f => pickPhoto(m, f)}>
+              Add photo
+            </PhotoInput>
+          )}
+        </div>
+      ))}
+      <div class="inline-add">
+        <input
+          value={newName}
+          maxLength={60}
+          placeholder="Add a member"
+          onInput={e => setNewName((e.target as HTMLInputElement).value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') add();
+          }}
+        />
+        <button class="btn" disabled={busy || !newName.trim()} onClick={add}>
+          Add
+        </button>
+      </div>
+      <p class="hint sans left">
+        Anyone you add can pick themselves as “you” when they open the link.
+      </p>
+
+      {renaming && (
+        <MemberNameSheet
+          member={renaming}
+          onSave={name => saveName(renaming, name)}
+          onClose={() => setRenaming(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Bottom sheet for renaming a member: just a text field, save/cancel. */
+function MemberNameSheet({
+  member,
+  onSave,
+  onClose,
+}: {
+  member: MemberRecord;
+  onSave: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(member.name);
+  const trimmed = name.trim();
+
+  return (
+    <div class="sheet-overlay" onClick={onClose}>
+      <div class="sheet" onClick={e => e.stopPropagation()}>
+        <h2>Rename {member.name}</h2>
+        <label class="field">
+          <span>Name</span>
+          <input
+            autofocus
+            value={name}
+            maxLength={60}
+            onInput={e => setName((e.target as HTMLInputElement).value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && trimmed) onSave(trimmed);
+            }}
+          />
+        </label>
+        <p class="hint sans left">Their expense history keeps up — only the label changes.</p>
+        <div class="btn-row">
+          <button class="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button class="btn primary" disabled={!trimmed} onClick={() => onSave(trimmed)}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
