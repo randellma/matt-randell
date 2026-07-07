@@ -180,10 +180,10 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
         <button class="btn" style="margin-top:11px;" disabled={busy} onClick={() => setRecording(true)}>
           Record a payment
         </button>
-        <p class="hint sans left">
+        <p class="hint sans left" style="margin-top:9px;">
           For money that changed hands in any other way than the suggestions above.
         </p>
-        <p class="hint sans left">
+        <p class="hint sans left" style="margin-top:4px;">
           Couples &amp; households are linked in Group settings.
         </p>
       </div>

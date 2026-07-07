@@ -108,6 +108,30 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const amountCents = parseMoney(amountText, currency);
   const fxCents = foreign ? parseMoney(fxText, groupCurrency) : null;
 
+  // Dirty-tracking for the leave-page warning: a snapshot of every field the
+  // user can edit, taken once on mount and compared against on every render.
+  const snapshot = JSON.stringify({
+    description, currency, amountText, payerIds, payerAmounts, date, mode,
+    participants, percents, shares, items, receiptId, fxText,
+  });
+  const initialSnapshot = useState(snapshot)[0];
+  const dirty = snapshot !== initialSnapshot;
+
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  function leave() {
+    if (dirty && !confirm('Discard unsaved changes to this expense?')) return;
+    onDone();
+  }
+
   useEffect(() => {
     if (!foreign) return;
     let cancelled = false;
@@ -360,7 +384,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   return (
     <div class="page">
       <header class="group-header">
-        <button class="back" onClick={onDone}>‹</button>
+        <button class="back" onClick={leave}>‹</button>
         <div class="group-title">
           <h1>{expense ? 'Edit expense' : 'Add expense'}</h1>
         </div>
@@ -487,9 +511,11 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                         inputMode="decimal"
                         value={percents[m.id] ?? ''}
                         placeholder="0"
+                        style={{ width: `calc(${Math.max(1, (percents[m.id] ?? '0').length)}ch + 4px)` }}
                         onInput={e =>
                           setPercents({ ...percents, [m.id]: (e.target as HTMLInputElement).value })
                         }
+                        onFocus={e => (e.target as HTMLInputElement).select()}
                       />
                       %
                     </span>

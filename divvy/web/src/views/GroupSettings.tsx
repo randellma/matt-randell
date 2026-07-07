@@ -1,4 +1,4 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { api, navigate } from '../app';
 import type { GroupRecord, MemberRecord } from '../api';
@@ -460,6 +460,12 @@ function MemberNameSheet({
 }) {
   const [name, setName] = useState(member.name);
   const trimmed = name.trim();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
 
   return (
     <div class="sheet-overlay" onClick={onClose}>
@@ -468,7 +474,7 @@ function MemberNameSheet({
         <label class="field">
           <span>Name</span>
           <input
-            autofocus
+            ref={inputRef}
             value={name}
             maxLength={60}
             onInput={e => setName((e.target as HTMLInputElement).value)}
@@ -637,6 +643,12 @@ function PartyNameSheet({
 }) {
   const joined = partyMembers.map(m => m.name).join(' & ');
   const [name, setName] = useState(partyMembers.map(m => m.party_name).find(Boolean) ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
 
   return (
     <div class="sheet-overlay" onClick={onClose}>
@@ -645,7 +657,7 @@ function PartyNameSheet({
         <label class="field">
           <span>Party name</span>
           <input
-            autofocus
+            ref={inputRef}
             value={name}
             maxLength={60}
             placeholder={joined}
