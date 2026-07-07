@@ -41,6 +41,10 @@ const RECEIPT_SCHEMA = {
   type: "object",
   properties: {
     merchant: { type: "string", description: "Merchant/restaurant name, or empty string if unreadable" },
+    currency: {
+      type: ["string", "null"],
+      description: "ISO 4217 currency code of the receipt's prices (e.g. USD, EUR, JPY), inferred from a printed symbol/code, or null if not identifiable",
+    },
     items: {
       type: "array",
       description: "Every purchasable line item. Exclude subtotal/tax/tip/total lines. Discounts and coupons are items with negative cents.",
@@ -59,7 +63,7 @@ const RECEIPT_SCHEMA = {
     tip_cents: { type: ["integer", "null"], description: "Tip/gratuity in cents, null if not shown" },
     total_cents: { type: ["integer", "null"], description: "Printed grand total in cents, null if not shown" },
   },
-  required: ["merchant", "items", "subtotal_cents", "tax_cents", "tip_cents", "total_cents"],
+  required: ["merchant", "currency", "items", "subtotal_cents", "tax_cents", "tip_cents", "total_cents"],
   additionalProperties: false,
 };
 
@@ -72,7 +76,8 @@ function buildRequest(model, mediaType, imageB64) {
       "Read the receipt image carefully, including faint or skewed text. " +
       "All money values are integer cents (e.g. $12.34 -> 1234). " +
       "If a quantity line shows unit price and quantity, report the line total. " +
-      "Never invent items; if a line is illegible, skip it.",
+      "Never invent items; if a line is illegible, skip it. " +
+      "Report the ISO 4217 currency code the prices are printed in if you can tell from a symbol, code, or other cues; if you can't confidently identify it, use null rather than guessing.",
     messages: [
       {
         role: "user",

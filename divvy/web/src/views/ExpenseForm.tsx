@@ -4,6 +4,7 @@ import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, SplitData } from '../api';
 import { allocate, allocateEven } from '../lib/money';
 import {
+  allCurrencies,
   convertMinor,
   currencySymbol,
   formatMoney,
@@ -265,6 +266,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       const total = parsed.total_cents ?? itemSum + (parsed.tax_cents ?? 0) + (parsed.tip_cents ?? 0);
       setAmountText((total / 100).toFixed(2));
       if (!description && parsed.merchant) setDescription(parsed.merchant);
+      if (parsed.currency && allCurrencies().includes(parsed.currency)) changeCurrency(parsed.currency);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

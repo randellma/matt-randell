@@ -16,6 +16,8 @@ export interface AssignedItem {
  */
 export interface ParsedReceipt {
   merchant: string;
+  /** ISO 4217 code the receipt's prices are printed in, or null if not identifiable. */
+  currency: string | null;
   items: { label: string; cents: number }[];
   subtotal_cents: number | null;
   tax_cents: number | null;
