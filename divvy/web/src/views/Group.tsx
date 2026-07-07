@@ -12,7 +12,7 @@ import {
 } from '../lib/balances';
 import { formatMoney } from '../lib/currency';
 import { partyDisplayName } from '../lib/party';
-import { colorForId, personInitial } from '../lib/avatar';
+import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
@@ -149,6 +149,12 @@ export function Group({ groupId, token, sub }: Props) {
     <div class="page">
       <header class="group-header">
         <button class="back" onClick={() => navigate('/')}>‹</button>
+        <Avatar
+          initials={collectiveInitials(group.name)}
+          color="#0B7A4E"
+          size={44}
+          src={api.groupPhotoUrl(group)}
+        />
         <div class="group-title">
           <h1>{group.name}</h1>
           <button
@@ -284,7 +290,7 @@ function ExpenseList({
 }: {
   expenses: ExpenseRecord[];
   groupCurrency: string;
-  memberById: Map<string, { name: string }>;
+  memberById: Map<string, MemberRecord>;
   memberCount: number;
   groupId: string;
   token: string;
@@ -307,11 +313,15 @@ function ExpenseList({
         {expenses.map((e, i) => {
           const delta = myDelta(expenseForBalance(e, groupCurrency), me);
           const currency = e.currency || groupCurrency;
-          const people = e.split.entries.map(en => ({
-            id: en.member,
-            initials: personInitial(nameOf(en.member)),
-            color: colorForId(en.member),
-          }));
+          const people = e.split.entries.map(en => {
+            const m = memberById.get(en.member);
+            return {
+              id: en.member,
+              initials: personInitial(nameOf(en.member)),
+              color: colorForId(en.member),
+              src: m && api.memberPhotoUrl(m),
+            };
+          });
           return (
             <li key={e.id}>
               {i > 0 && <hr class="rule" />}
@@ -377,6 +387,11 @@ function JoinScreen({
   return (
     <div class="page">
       <header class="app-header">
+        {group.photo && (
+          <div style="display:flex;justify-content:center;margin-bottom:10px;">
+            <Avatar initials={collectiveInitials(group.name)} color="#0B7A4E" size={64} src={api.groupPhotoUrl(group)} />
+          </div>
+        )}
         <h1>{group.name}</h1>
         <p class="tagline">Who are you?</p>
       </header>
@@ -384,7 +399,7 @@ function JoinScreen({
         <div class="chip-row wrap">
           {members.map(m => (
             <button key={m.id} class="chip lg with-avatar" onClick={() => onJoined(m.id)}>
-              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} />
+              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} src={api.memberPhotoUrl(m)} />
               {m.name}
             </button>
           ))}

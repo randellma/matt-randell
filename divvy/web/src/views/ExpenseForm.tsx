@@ -478,7 +478,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <div class="split-rows" style="margin-top:13px;">
               {inSplit.map(m => (
                 <div key={m.id} class="split-row">
-                  <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
+                  <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} src={api.memberPhotoUrl(m)} />
                   <span class="split-name">{m.name}</span>
                   <span class="stepper">
                     <button onClick={() => stepPercent(m.id, -5)}>−</button>
@@ -508,7 +508,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                   <div class="chip-row wrap">
                     {removed.map(m => (
                       <button key={m.id} class="chip ghost with-avatar" onClick={() => addBackToPercent(m.id)}>
-                        <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={24} />
+                        <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={24} src={api.memberPhotoUrl(m)} />
                         {m.name}
                       </button>
                     ))}
@@ -525,7 +525,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           <div class="split-rows" style="margin-top:13px;">
             {members.map(m => (
               <div key={m.id} class="split-row">
-                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} />
+                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} src={api.memberPhotoUrl(m)} />
                 <span class="split-name">{m.name}</span>
                 <span class="stepper">
                   <button onClick={() => setShares({ ...shares, [m.id]: Math.max(0, (shares[m.id] ?? 0) - 1) })}>
@@ -566,7 +566,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               const maxCents = Math.max(1, ...entries.map(e => e.cents));
               return entries.map(e => (
                 <li key={e.member}>
-                  <Avatar initials={personInitial(memberById.get(e.member)?.name ?? '?')} color={colorForId(e.member)} size={28} />
+                  <Avatar
+                    initials={personInitial(memberById.get(e.member)?.name ?? '?')}
+                    color={colorForId(e.member)}
+                    size={28}
+                    src={memberById.get(e.member) && api.memberPhotoUrl(memberById.get(e.member)!)}
+                  />
                   <span class="preview-name">{memberById.get(e.member)?.name ?? '?'}</span>
                   <span class="preview-bar-track">
                     <span class="preview-bar-fill" style={{ width: `${Math.round((e.cents / maxCents) * 100)}%` }} />
@@ -648,7 +653,7 @@ function MemberChips({
               class={`${cls} with-avatar ${on ? 'on' : ''}`}
               onClick={() => onChange(on ? selected.filter(s => s !== m.id) : [...selected, m.id])}
             >
-              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={avatarSize} />
+              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={avatarSize} src={api.memberPhotoUrl(m)} />
               {m.name}
             </button>
           );

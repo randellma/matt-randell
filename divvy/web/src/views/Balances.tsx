@@ -11,7 +11,6 @@ import {
   unitNets,
   type UnitBalance,
 } from '../lib/balances';
-import { newToken } from '../identity';
 import { colorForBalance, collectiveInitials } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
 
@@ -44,6 +43,12 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   const unitName = (u: UnitBalance) => {
     const custom = u.memberIds.map(id => memberById.get(id)?.party_name).find(Boolean);
     return custom || u.memberIds.map(nameOf).join(' & ');
+  };
+  /** Party photo for a linked unit, the member's own photo for a solo one. */
+  const unitPhoto = (u: UnitBalance) => {
+    const unitMembers = u.memberIds.map(id => memberById.get(id)).filter(m => m !== undefined);
+    if (u.memberIds.length > 1) return api.partyPhotoUrl(unitMembers);
+    return unitMembers[0] ? api.memberPhotoUrl(unitMembers[0]) : undefined;
   };
   const transfers = suggestSettlements(unitNets(units));
 
@@ -102,7 +107,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                 {i > 0 && <hr class="rule" style="margin-bottom:16px;" />}
                 <div class="balance-unit">
                   <div class="balance-line">
-                    <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} />
+                    <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} src={unitPhoto(u)} />
                     <span class="name">{unitName(u)}</span>
                     <BalanceAmount cents={u.cents} fmt={fmt} />
                   </div>
@@ -137,9 +142,9 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                 return (
                   <li key={`${t.from}-${t.to}`} class="settle-row">
                     <span class="settle-people">
-                      <Avatar initials={collectiveInitials(unitName(from))} color="#B84A38" size={26} />
+                      <Avatar initials={collectiveInitials(unitName(from))} color="#B84A38" size={26} src={unitPhoto(from)} />
                       <span class="settle-arrow">→</span>
-                      <Avatar initials={collectiveInitials(unitName(to))} color="#0B7A4E" size={26} />
+                      <Avatar initials={collectiveInitials(unitName(to))} color="#0B7A4E" size={26} src={unitPhoto(to)} />
                       <span>{unitName(from)} pays {unitName(to)} {fmt(t.cents)}</span>
                     </span>
                     <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
@@ -153,9 +158,6 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
           <hr class="rule" />
         </>
       )}
-
-      <PartyEditor members={members} token={token} busy={busy} run={run} unitByKey={unitByKey} />
-      <hr class="rule" />
 
       <div>
         <div class="seclbl left">Payments</div>
@@ -180,6 +182,9 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
         </button>
         <p class="hint sans left">
           For money that changed hands in any other way than the suggestions above.
+        </p>
+        <p class="hint sans left">
+          Couples &amp; households are linked in Group settings.
         </p>
       </div>
 
@@ -222,116 +227,6 @@ function BalanceAmount({ cents, fmt }: { cents: number; fmt: (cents: number) => 
     <span class={`stamp ${cents < 0 ? 'red' : ''}`}>
       {cents > 0 ? `Gets ${fmt(cents)}` : `Owes ${fmt(-cents)}`}
     </span>
-  );
-}
-
-/**
- * Link members into parties ("one wallet"). A party is just a shared key on
- * the member records; unlinking clears it.
- */
-function PartyEditor({
-  members,
-  token,
-  busy,
-  run,
-  unitByKey,
-}: {
-  members: MemberRecord[];
-  token: string;
-  busy: boolean;
-  run: (action: () => Promise<void>) => void;
-  unitByKey: Map<string, UnitBalance>;
-}) {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [renaming, setRenaming] = useState<MemberRecord[] | null>(null);
-
-  const parties = new Map<string, MemberRecord[]>();
-  for (const m of members) {
-    if (m.party) parties.set(m.party, [...(parties.get(m.party) ?? []), m]);
-  }
-  const solo = members.filter(m => !m.party);
-
-  function link() {
-    if (selected.length < 2) return;
-    const key = newToken().slice(0, 12);
-    const ids = selected;
-    setSelected([]);
-    run(async () => {
-      for (const id of ids) await api.updateMember(id, { party: key, party_name: '' }, token);
-    });
-  }
-
-  function unlink(partyMembers: MemberRecord[]) {
-    run(async () => {
-      for (const m of partyMembers) await api.updateMember(m.id, { party: '', party_name: '' }, token);
-    });
-  }
-
-  function saveName(partyMembers: MemberRecord[], name: string) {
-    setRenaming(null);
-    run(async () => {
-      for (const m of partyMembers) await api.updateMember(m.id, { party_name: name }, token);
-    });
-  }
-
-  return (
-    <div class="stack-sm">
-      <div class="seclbl left">Couples &amp; households</div>
-      <p class="hint sans left">
-        Linked members settle as one wallet — the group sees a combined
-        balance; the breakdown stays visible above.
-      </p>
-
-      {[...parties.entries()].map(([key, pm]) => {
-        const custom = pm.map(m => m.party_name).find(Boolean);
-        const displayName = custom || pm.map(m => m.name).join(' & ');
-        const cents = unitByKey.get(key)?.cents ?? 0;
-        return (
-          <div key={key} class="party-row">
-            <Avatar initials={collectiveInitials(displayName)} color={colorForBalance(cents)} size={30} />
-            <button class="party-name" title="Rename" onClick={() => setRenaming(pm)}>
-              <span>{displayName} ✏️</span>
-              {custom && <span class="party-sub">{pm.map(m => m.name).join(' & ')}</span>}
-            </button>
-            <button class="btn small" disabled={busy} onClick={() => unlink(pm)}>
-              Unlink
-            </button>
-          </div>
-        );
-      })}
-
-      {solo.length >= 2 && (
-        <>
-          <div class="chip-row wrap">
-            {solo.map(m => {
-              const on = selected.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  class={`chip ${on ? 'on' : ''}`}
-                  onClick={() =>
-                    setSelected(on ? selected.filter(s => s !== m.id) : [...selected, m.id])
-                  }
-                >
-                  {m.name}
-                </button>
-              );
-            })}
-          </div>
-          <button class="btn" disabled={busy || selected.length < 2} onClick={link}>
-            Link {selected.length >= 2 ? selected.map(id => members.find(m => m.id === id)?.name).join(' & ') : 'selected'}
-          </button>
-        </>
-      )}
-
-      {renaming && (
-        <PartyNameSheet
-          partyMembers={renaming}
-          onSave={name => saveName(renaming, name)}
-          onClose={() => setRenaming(null)}
-        />
-      )}
-    </div>
   );
 }
 
@@ -458,46 +353,3 @@ function PaymentSheet({
   );
 }
 
-/** Bottom sheet for naming a party: just a text field, save/cancel. */
-function PartyNameSheet({
-  partyMembers,
-  onSave,
-  onClose,
-}: {
-  partyMembers: MemberRecord[];
-  onSave: (name: string) => void;
-  onClose: () => void;
-}) {
-  const joined = partyMembers.map(m => m.name).join(' & ');
-  const [name, setName] = useState(partyMembers.map(m => m.party_name).find(Boolean) ?? '');
-
-  return (
-    <div class="sheet-overlay" onClick={onClose}>
-      <div class="sheet" onClick={e => e.stopPropagation()}>
-        <h2>Name your crew</h2>
-        <label class="field">
-          <span>Party name</span>
-          <input
-            autofocus
-            value={name}
-            maxLength={60}
-            placeholder={joined}
-            onInput={e => setName((e.target as HTMLInputElement).value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') onSave(name.trim());
-            }}
-          />
-        </label>
-        <p class="hint sans left">Leave empty to go back to “{joined}”.</p>
-        <div class="btn-row">
-          <button class="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button class="btn primary" onClick={() => onSave(name.trim())}>
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

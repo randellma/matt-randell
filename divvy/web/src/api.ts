@@ -10,6 +10,8 @@ export interface GroupRecord {
   currency: string;
   /** default currency for new expenses; '' = same as `currency` */
   expense_currency: string;
+  /** avatar photo filename; '' = initials avatar */
+  photo: string;
 }
 
 export interface MemberRecord {
@@ -20,6 +22,10 @@ export interface MemberRecord {
   party: string;
   /** optional party display name, mirrored on every member of the party */
   party_name: string;
+  /** avatar photo filename; '' = initials avatar */
+  photo: string;
+  /** party avatar photo filename, mirrored on every member of the party */
+  party_photo: string;
 }
 
 /** Everything needed to render and re-edit a split, stored as JSON on the expense. */
@@ -86,10 +92,35 @@ export interface ReceiptRecord {
 /** All calls attach the group token as ?t= — that's the whole auth model. */
 export class DivvyApi {
   private pb: PocketBase;
+  private base: string;
 
   constructor(baseUrl: string) {
     this.pb = new PocketBase(baseUrl);
     this.pb.autoCancellation(false);
+    this.base = baseUrl.replace(/\/$/, '');
+  }
+
+  /**
+   * Direct URL for a stored file. PocketBase serves unprotected files to
+   * anyone holding the URL — filenames are random, and the group is
+   * link-access anyway (same stance as receipt images).
+   */
+  private fileUrl(collection: 'groups' | 'members', recordId: string, filename: string): string {
+    return `${this.base}/api/files/${collection}/${recordId}/${encodeURIComponent(filename)}`;
+  }
+
+  groupPhotoUrl(g: GroupRecord): string | undefined {
+    return g.photo ? this.fileUrl('groups', g.id, g.photo) : undefined;
+  }
+
+  memberPhotoUrl(m: MemberRecord): string | undefined {
+    return m.photo ? this.fileUrl('members', m.id, m.photo) : undefined;
+  }
+
+  /** The party's photo lives (mirrored) on its members — first one wins. */
+  partyPhotoUrl(partyMembers: MemberRecord[]): string | undefined {
+    const holder = partyMembers.find(m => m.party_photo);
+    return holder ? this.fileUrl('members', holder.id, holder.party_photo) : undefined;
   }
 
   async createGroup(
@@ -129,10 +160,40 @@ export class DivvyApi {
 
   async updateMember(
     memberId: string,
-    data: Partial<Pick<MemberRecord, 'name' | 'party' | 'party_name'>>,
+    // party_photo is a file field: null deletes it (on unlink); uploading goes
+    // through setPartyPhoto.
+    data: Partial<Pick<MemberRecord, 'name' | 'party' | 'party_name'>> & { party_photo?: null },
     t: string,
   ): Promise<MemberRecord> {
     return this.pb.collection('members').update(memberId, data, { query: { t } });
+  }
+
+  /** Set (or with null, remove) a group's avatar photo. */
+  async setGroupPhoto(groupId: string, photo: Blob | null, t: string): Promise<GroupRecord> {
+    return this.pb.collection('groups').update(groupId, this.photoPayload('photo', photo), { query: { t } });
+  }
+
+  /** Set (or with null, remove) a member's avatar photo. */
+  async setMemberPhoto(memberId: string, photo: Blob | null, t: string): Promise<MemberRecord> {
+    return this.pb.collection('members').update(memberId, this.photoPayload('photo', photo), { query: { t } });
+  }
+
+  /** Set (or with null, remove) a party's photo, mirrored on every member. */
+  async setPartyPhoto(memberIds: string[], photo: Blob | null, t: string): Promise<MemberRecord[]> {
+    const updated: MemberRecord[] = [];
+    for (const id of memberIds) {
+      updated.push(
+        await this.pb.collection('members').update(id, this.photoPayload('party_photo', photo), { query: { t } }),
+      );
+    }
+    return updated;
+  }
+
+  private photoPayload(field: string, photo: Blob | null): FormData | Record<string, null> {
+    if (photo === null) return { [field]: null };
+    const form = new FormData();
+    form.set(field, photo, 'avatar.jpg');
+    return form;
   }
 
   async listExpenses(groupId: string, t: string): Promise<ExpenseRecord[]> {

@@ -12,6 +12,8 @@ interface GroupSummary {
   expenseCount: number;
   balanceCents?: number;
   currency: string;
+  /** group avatar photo, if one has been set */
+  photoUrl?: string;
 }
 
 /** Fetches member/expense counts and your net position for each joined group, best-effort. */
@@ -39,7 +41,13 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
           const myUnit = g.memberId ? units.find(u => u.memberIds.includes(g.memberId!)) : undefined;
           setSummaries(s => ({
             ...s,
-            [g.id]: { memberCount: members.length, expenseCount: expenses.length, balanceCents: myUnit?.cents, currency },
+            [g.id]: {
+              memberCount: members.length,
+              expenseCount: expenses.length,
+              balanceCents: myUnit?.cents,
+              currency,
+              photoUrl: api.groupPhotoUrl(group),
+            },
           }));
         })
         .catch(() => {
@@ -80,7 +88,7 @@ export function Home() {
                 <li key={g.id}>
                   {i > 0 && <hr class="rule" />}
                   <button class="row-btn group-row" onClick={() => navigate(groupPath(g.id, g.t))}>
-                    <Avatar initials={collectiveInitials(g.name)} color="#0B7A4E" size={42} />
+                    <Avatar initials={collectiveInitials(g.name)} color="#0B7A4E" size={42} src={s?.photoUrl} />
                     <span class="group-row-main">
                       <span class="group-name">{g.name}</span>
                       <span class="group-meta">

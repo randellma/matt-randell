@@ -4,6 +4,36 @@
  * (iPhones hand us HEIC otherwise). Falls back to the original file if the
  * browser can't decode it.
  */
+/**
+ * Center-crop a photo to a small square JPEG for an avatar. Avatars render at
+ * 44px and below, so 256px leaves plenty of headroom for retina screens while
+ * keeping uploads a few KB. Falls back to the original file if the browser
+ * can't decode it.
+ */
+export async function prepareAvatarImage(file: File, edge = 256): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const crop = Math.min(bitmap.width, bitmap.height);
+    const sx = Math.round((bitmap.width - crop) / 2);
+    const sy = Math.round((bitmap.height - crop) / 2);
+    const size = Math.min(edge, crop);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    canvas.getContext('2d')!.drawImage(bitmap, sx, sy, crop, crop, 0, 0, size, size);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.85),
+    );
+    if (blob) return blob;
+  } catch {
+    // fall through to original
+  }
+  return file;
+}
+
 export async function prepareReceiptImage(file: File, maxEdge = 1800): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);

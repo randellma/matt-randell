@@ -2,10 +2,12 @@ interface Props {
   initials: string;
   color: string;
   size?: number;
+  /** photo URL — shown instead of the initials when set */
+  src?: string;
 }
 
-/** Squared "luggage-tag" avatar with initials — person, party, or group. */
-export function Avatar({ initials, color, size = 30 }: Props) {
+/** Squared "luggage-tag" avatar — person, party, or group. Photo when one is set, initials otherwise. */
+export function Avatar({ initials, color, size = 30, src }: Props) {
   return (
     <span
       class="avatar"
@@ -17,7 +19,7 @@ export function Avatar({ initials, color, size = 30 }: Props) {
         fontSize: Math.round(size * 0.38),
       }}
     >
-      {initials}
+      {src ? <img src={src} alt="" /> : initials}
     </span>
   );
 }
@@ -28,7 +30,7 @@ export function AvatarStack({
   max = 4,
   size = 26,
 }: {
-  people: { id: string; initials: string; color: string }[];
+  people: { id: string; initials: string; color: string; src?: string }[];
   max?: number;
   size?: number;
 }) {
@@ -37,7 +39,7 @@ export function AvatarStack({
   return (
     <span class="avatar-stack">
       {shown.map(p => (
-        <Avatar key={p.id} initials={p.initials} color={p.color} size={size} />
+        <Avatar key={p.id} initials={p.initials} color={p.color} size={size} src={p.src} />
       ))}
       {extra > 0 && (
         <span class="avatar avatar-more" style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }}>
