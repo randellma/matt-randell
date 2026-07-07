@@ -53,13 +53,26 @@ A Member's net position in a Group: what they've paid minus what they owe, acros
 _Avoid_: Debt, credit, tab
 
 **Payment**:
-A recorded transfer between two Members, outside the app (cash, Venmo, whatever) — either a settlement suggestion marked paid, or any arbitrary amount recorded by hand. Recording it is bookkeeping; Divvy never moves money.
+A recorded transfer between two Members, outside the app (cash, Venmo, whatever) — either a settlement suggestion marked paid, or any arbitrary amount recorded by hand. Recording it is bookkeeping; Divvy never moves money. Always recorded in the Group currency.
 _Avoid_: Settlement (the *suggestion* is a settlement; the recorded fact is a Payment), transfer
+
+**Group currency**:
+The one currency Balances, settle-up, and group-level totals are reported in. Chosen at group creation (defaulting to the creator's locale); changing it later re-converts every Expense's and Payment's stored conversion at its own date. Old groups without one are USD.
+_Avoid_: Base currency, home currency
+
+**Expense currency**:
+The currency an Expense was actually paid in — its amount, Payers, and Split all live in this currency's minor units. Defaults to the Group's *default expense currency* (settable for trips where spending ≠ settling) and is switchable per Expense.
+_Avoid_: Local currency, original currency (in code)
+
+**Conversion (fx)**:
+A foreign-currency Expense or Payment stores `fx_cents`: its total in Group-currency minor units, prefilled from the ECB rate at the record's date and freely editable. Balances rescale the Split and Payer amounts proportionally to `fx_cents` — the rate is a prefill, the converted amount is the stored fact.
+_Avoid_: Exchange (as a noun), rate (as the stored thing — the amount is stored, not the rate)
 
 ## Invariants
 
-- Every Split's per-Member amounts are integer cents summing exactly to the Expense amount — remainder pennies go to the largest fractional shares. The same holds for Payer amounts.
-- Balances across a Group always sum to zero — per Member and per Unit alike; linking Members into a Party never creates or destroys money.
+- Every Split's per-Member amounts are integers in the Expense currency's minor units, summing exactly to the Expense amount — remainder pennies go to the largest fractional shares. The same holds for Payer amounts.
+- Balances across a Group always sum to zero — per Member and per Unit alike; linking Members into a Party never creates or destroys money. Converting a foreign Expense for Balances rescales credits and debits to the same `fx_cents`, so conversion never creates or destroys money either.
+- Balances, settle-up, and Payments are Group-currency only; an Expense's own currency never leaks into the ledger.
 - A Payment between two Members of the same Party changes their internal breakdown but not the Party's group-level Balance.
 - OCR output is a draft: an Itemized Split is never saved until a human has assigned every Item.
 

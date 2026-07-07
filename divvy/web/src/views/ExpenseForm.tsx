@@ -2,13 +2,24 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, SplitData } from '../api';
-import { allocate, allocateEven, formatCents, parseAmount } from '../lib/money';
+import { allocate, allocateEven } from '../lib/money';
+import {
+  convertMinor,
+  currencySymbol,
+  formatMoney,
+  impliedRate,
+  moneyInputValue,
+  moneyPlaceholder,
+  parseMoney,
+} from '../lib/currency';
+import { fetchRate } from '../lib/fx';
 import { groupParties, partyDisplayName } from '../lib/party';
 import { computeEven, computePercent, computeShares, type SplitEntry, type SplitMode } from '../lib/split';
 import { computeItemized, type AssignedItem } from '../lib/receipt';
 import { prepareReceiptImage } from '../image';
 import { colorForId, personInitial } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
+import { CurrencySelect } from '../components/CurrencySelect';
 
 interface Props {
   group: GroupRecord;
@@ -27,9 +38,17 @@ const MODES: { id: SplitMode; label: string }[] = [
 ];
 
 export function ExpenseForm({ group, token, members, me, expense, onDone }: Props) {
+  const groupCurrency = group.currency || 'USD';
+  // Existing expenses keep their own currency; new ones start at the group's
+  // default expense currency (set for trips where spending ≠ settling).
+  const initialCurrency = expense
+    ? expense.currency || groupCurrency
+    : group.expense_currency || groupCurrency;
+
   const [description, setDescription] = useState(expense?.description ?? '');
+  const [currency, setCurrency] = useState(initialCurrency);
   const [amountText, setAmountText] = useState(
-    expense ? (expense.amount_cents / 100).toFixed(2) : '',
+    expense ? moneyInputValue(expense.amount_cents, initialCurrency) : '',
   );
   const [payerIds, setPayerIds] = useState<string[]>(
     expense?.payers?.length ? expense.payers.map(p => p.member) : [expense?.paid_by ?? me],
@@ -39,7 +58,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     if (expense?.payers && expense.payers.length > 1) {
-      for (const p of expense.payers) init[p.member] = (p.cents / 100).toFixed(2);
+      for (const p of expense.payers) init[p.member] = moneyInputValue(p.cents, initialCurrency);
     }
     return init;
   });
@@ -74,14 +93,49 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const amountCents = parseAmount(amountText);
+  // Foreign-currency conversion. The converted amount (in group currency) is
+  // what balances use; it follows the fetched rate until hand-edited, same
+  // pattern as the payer amounts below.
+  const foreign = currency !== groupCurrency;
+  const [fxText, setFxText] = useState(
+    expense?.fx_cents ? moneyInputValue(expense.fx_cents, groupCurrency) : '',
+  );
+  const [fxManual, setFxManual] = useState(!!expense?.fx_cents);
+  const [fxRate, setFxRate] = useState<number | null>(null);
+  const [fxError, setFxError] = useState('');
+
+  const amountCents = parseMoney(amountText, currency);
+  const fxCents = foreign ? parseMoney(fxText, groupCurrency) : null;
+
+  useEffect(() => {
+    if (!foreign) return;
+    let cancelled = false;
+    setFxRate(null);
+    setFxError('');
+    fetchRate(currency, groupCurrency, date).then(
+      r => { if (!cancelled) setFxRate(r); },
+      () => { if (!cancelled) setFxError(`No rate found — type the ${groupCurrency} amount yourself.`); },
+    );
+    return () => { cancelled = true; };
+  }, [foreign, currency, groupCurrency, date]);
+
+  useEffect(() => {
+    if (!foreign || fxManual || fxRate === null || amountCents === null || amountCents <= 0) return;
+    setFxText(moneyInputValue(convertMinor(amountCents, currency, groupCurrency, fxRate), groupCurrency));
+  }, [foreign, fxManual, fxRate, amountCents, currency, groupCurrency]);
+
+  function changeCurrency(code: string) {
+    setCurrency(code);
+    setFxManual(false);
+    setFxText('');
+  }
 
   // Keep multi-payer amounts pinned to an even split of the total until edited.
   useEffect(() => {
     if (payersEdited || payerIds.length < 2 || amountCents === null || amountCents <= 0) return;
     const cents = allocateEven(amountCents, payerIds.length);
-    setPayerAmounts(Object.fromEntries(payerIds.map((id, i) => [id, (cents[i]! / 100).toFixed(2)])));
-  }, [payersEdited, payerIds, amountCents]);
+    setPayerAmounts(Object.fromEntries(payerIds.map((id, i) => [id, moneyInputValue(cents[i]!, currency)])));
+  }, [payersEdited, payerIds, amountCents, currency]);
 
   function togglePayers(ids: string[]) {
     setPayerIds(ids);
@@ -137,10 +191,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     const next = { ...payerAmounts, [id]: text };
     // With exactly two payers, the other side auto-balances to the total.
     if (payerIds.length === 2 && amountCents !== null) {
-      const cents = parseAmount(text);
+      const cents = parseMoney(text, currency);
       const other = payerIds.find(p => p !== id)!;
       if (cents !== null && cents <= amountCents) {
-        next[other] = ((amountCents - cents) / 100).toFixed(2);
+        next[other] = moneyInputValue(amountCents - cents, currency);
       }
     }
     setPayerAmounts(next);
@@ -222,6 +276,9 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setError('');
     if (!description.trim()) return setError('Add a description');
     if (amountCents === null || amountCents <= 0) return setError('Enter a valid amount');
+    if (foreign && (fxCents === null || fxCents <= 0)) {
+      return setError(`Enter what this comes to in ${groupCurrency}`);
+    }
     if (!preview.entries) return setError(preview.problem ?? 'Split is incomplete');
 
     let payers: PayerEntry[];
@@ -229,12 +286,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     if (payerIds.length === 1) {
       payers = [{ member: payerIds[0]!, cents: amountCents }];
     } else {
-      const entries = payerIds.map(id => ({ member: id, cents: parseAmount(payerAmounts[id] ?? '') }));
+      const entries = payerIds.map(id => ({ member: id, cents: parseMoney(payerAmounts[id] ?? '', currency) }));
       if (entries.some(p => p.cents === null)) return setError('Enter what each payer paid');
       const sum = entries.reduce((a, p) => a + p.cents!, 0);
       if (sum !== amountCents) {
         return setError(
-          `Payer amounts add up to ${formatCents(sum)}, but the expense is ${formatCents(amountCents)}`,
+          `Payer amounts add up to ${formatMoney(sum, currency)}, but the expense is ${formatMoney(amountCents, currency)}`,
         );
       }
       payers = entries.filter(p => p.cents! > 0).map(p => ({ member: p.member, cents: p.cents! }));
@@ -270,6 +327,8 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           split,
           receipt: receiptId,
           notes: expense?.notes ?? '',
+          currency,
+          fx_cents: foreign ? fxCents! : 0,
         },
         token,
         expense?.id,
@@ -324,12 +383,15 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         <div class="field-row" style="margin-top:13px;">
           <label class="field grow">
             <span>Amount</span>
-            <input
-              inputMode="decimal"
-              value={amountText}
-              placeholder="0.00"
-              onInput={e => setAmountText((e.target as HTMLInputElement).value)}
-            />
+            <span class="amount-wrap">
+              <CurrencySelect compact value={currency} onChange={changeCurrency} />
+              <input
+                inputMode="decimal"
+                value={amountText}
+                placeholder={moneyPlaceholder(currency)}
+                onInput={e => setAmountText((e.target as HTMLInputElement).value)}
+              />
+            </span>
           </label>
           <label class="field grow date">
             <span>Date</span>
@@ -340,6 +402,28 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             />
           </label>
         </div>
+        {foreign && (
+          <FxRow
+            currency={currency}
+            groupCurrency={groupCurrency}
+            amountCents={amountCents}
+            fxCents={fxCents}
+            fxText={fxText}
+            fxError={fxError}
+            onEdit={t => {
+              setFxManual(true);
+              setFxText(t);
+            }}
+            onRefresh={() => {
+              setFxManual(false);
+              setFxError('');
+              fetchRate(currency, groupCurrency, date).then(
+                setFxRate,
+                () => setFxError(`No rate found — type the ${groupCurrency} amount yourself.`),
+              );
+            }}
+          />
+        )}
         <div class="field" style="margin-top:14px;">
           <span>Paid by</span>
           <MemberChips members={members} selected={payerIds} onChange={togglePayers} />
@@ -350,17 +434,17 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               <div key={id} class="split-row">
                 <span class="split-name">{memberById.get(id)?.name ?? '?'}</span>
                 <span class="payer-input">
-                  $
+                  {currencySymbol(currency)}
                   <input
                     inputMode="decimal"
                     value={payerAmounts[id] ?? ''}
-                    placeholder="0.00"
+                    placeholder={moneyPlaceholder(currency)}
                     onInput={e => editPayerAmount(id, (e.target as HTMLInputElement).value)}
                   />
                 </span>
               </div>
             ))}
-            <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} />
+            <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} currency={currency} />
           </div>
         )}
       </div>
@@ -462,6 +546,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               setItems={setItems}
               members={members}
               amountCents={amountCents}
+              currency={currency}
               scanState={scanState}
               onScan={scanReceipt}
             />
@@ -484,7 +569,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                   <span class="preview-bar-track">
                     <span class="preview-bar-fill" style={{ width: `${Math.round((e.cents / maxCents) * 100)}%` }} />
                   </span>
-                  <b class="num">{formatCents(e.cents)}</b>
+                  <b class="num">{formatMoney(e.cents, currency)}</b>
                 </li>
               ));
             })()}
@@ -500,7 +585,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       <button class="btn primary big" onClick={save} disabled={busy || scanState === 'working'}>
         {busy
           ? 'Saving…'
-          : `${expense ? 'Save changes' : 'Add expense'}${amountCents !== null && amountCents > 0 ? ` · ${formatCents(amountCents)}` : ''}`}
+          : `${expense ? 'Save changes' : 'Add expense'}${amountCents !== null && amountCents > 0 ? ` · ${formatMoney(amountCents, currency)}` : ''}`}
       </button>
       <hr class="rule" style="margin-top:8px;" />
       <div class="barcode" />
@@ -582,18 +667,70 @@ function PayerSum({
   payerIds,
   payerAmounts,
   amountCents,
+  currency,
 }: {
   payerIds: string[];
   payerAmounts: Record<string, string>;
   amountCents: number | null;
+  currency: string;
 }) {
   if (amountCents === null) return null;
-  const sum = payerIds.reduce((a, id) => a + (parseAmount(payerAmounts[id] ?? '') ?? 0), 0);
+  const sum = payerIds.reduce((a, id) => a + (parseMoney(payerAmounts[id] ?? '', currency) ?? 0), 0);
   const ok = sum === amountCents;
   return (
     <p class={ok ? 'hint ok' : 'hint warn'}>
-      Paid: {formatCents(sum)} {ok ? '✓' : `(expense is ${formatCents(amountCents)})`}
+      Paid: {formatMoney(sum, currency)} {ok ? '✓' : `(expense is ${formatMoney(amountCents, currency)})`}
     </p>
+  );
+}
+
+/**
+ * The "≈ in group currency" line under the amount when the expense is in a
+ * foreign currency. The converted amount is editable (rates are a prefill,
+ * not gospel); ↻ goes back to the fetched rate for the expense's date.
+ */
+function FxRow({
+  currency,
+  groupCurrency,
+  amountCents,
+  fxCents,
+  fxText,
+  fxError,
+  onEdit,
+  onRefresh,
+}: {
+  currency: string;
+  groupCurrency: string;
+  amountCents: number | null;
+  fxCents: number | null;
+  fxText: string;
+  fxError: string;
+  onEdit: (text: string) => void;
+  onRefresh: () => void;
+}) {
+  const rate =
+    amountCents !== null && amountCents > 0 && fxCents !== null && fxCents > 0
+      ? impliedRate(amountCents, currency, fxCents, groupCurrency)
+      : null;
+  return (
+    <div class="fx-row" style="margin-top:9px;">
+      <span class="muted">≈</span>
+      <span class="payer-input">
+        {currencySymbol(groupCurrency)}
+        <input
+          inputMode="decimal"
+          value={fxText}
+          placeholder={moneyPlaceholder(groupCurrency)}
+          onInput={e => onEdit((e.target as HTMLInputElement).value)}
+        />
+      </span>
+      <span class="fx-meta muted">
+        {fxError || (rate !== null ? `1 ${currency} = ${rate.toFixed(4)} ${groupCurrency}` : 'Fetching rate…')}
+      </span>
+      <button class="fx-refresh" title="Use the market rate" onClick={onRefresh}>
+        ↻
+      </button>
+    </div>
   );
 }
 
@@ -612,6 +749,7 @@ function ItemEditor({
   setItems,
   members,
   amountCents,
+  currency,
   scanState,
   onScan,
 }: {
@@ -619,6 +757,7 @@ function ItemEditor({
   setItems: (updater: AssignedItem[] | ((prev: AssignedItem[]) => AssignedItem[])) => void;
   members: MemberRecord[];
   amountCents: number | null;
+  currency: string;
   scanState: 'idle' | 'working';
   onScan: (file: File) => void;
 }) {
@@ -641,16 +780,16 @@ function ItemEditor({
 
   function editPrice(idx: number) {
     const item = items[idx]!;
-    const answer = prompt(`Price for "${item.label}"`, (item.cents / 100).toFixed(2));
+    const answer = prompt(`Price for "${item.label}"`, moneyInputValue(item.cents, currency));
     if (answer === null) return;
-    const cents = parseAmount(answer.startsWith('-') ? answer.slice(1) : answer);
+    const cents = parseMoney(answer.startsWith('-') ? answer.slice(1) : answer, currency);
     if (cents === null) return;
     const signed = answer.startsWith('-') ? -cents : cents;
     setItems(items.map((it, i) => (i === idx ? { ...it, cents: signed } : it)));
   }
 
   function addDraft() {
-    const cents = parseAmount(draftPrice);
+    const cents = parseMoney(draftPrice, currency);
     if (!draftLabel.trim() || cents === null) return;
     setItems([...items, { label: draftLabel.trim(), cents, assignees: [] }]);
     setDraftLabel('');
@@ -691,7 +830,7 @@ function ItemEditor({
                   <span class="item-label">{item.label}</span>
                   <span class="lead" />
                   <button class="item-price" onClick={() => editPrice(idx)}>
-                    {formatCents(item.cents)}
+                    {formatMoney(item.cents, currency)}
                   </button>
                   <button
                     class="item-remove"
@@ -715,10 +854,10 @@ function ItemEditor({
           </ul>
 
           <div class="totals-line">
-            <div class="li"><span class="nm muted">Items</span><span class="lead" /><span class="amt">{formatCents(itemSum)}</span></div>
+            <div class="li"><span class="nm muted">Items</span><span class="lead" /><span class="amt">{formatMoney(itemSum, currency)}</span></div>
             {extras !== null && (
               <div class={`li ${extras < 0 ? 'warn' : ''}`}>
-                <span class="nm muted">Tax &amp; tip · proportional</span><span class="lead" /><span class="amt">{formatCents(extras)}</span>
+                <span class="nm muted">Tax &amp; tip · proportional</span><span class="lead" /><span class="amt">{formatMoney(extras, currency)}</span>
               </div>
             )}
           </div>
@@ -740,7 +879,7 @@ function ItemEditor({
           class="price"
           inputMode="decimal"
           value={draftPrice}
-          placeholder="0.00"
+          placeholder={moneyPlaceholder(currency)}
           onInput={e => setDraftPrice((e.target as HTMLInputElement).value)}
         />
         <button class="btn" onClick={addDraft}>

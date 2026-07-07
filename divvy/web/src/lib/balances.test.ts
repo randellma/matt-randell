@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateUnits, computeNets, suggestSettlements, unitNets } from './balances';
+import {
+  aggregateUnits,
+  computeNets,
+  expenseForBalance,
+  expenseGroupCents,
+  paymentGroupCents,
+  suggestSettlements,
+  unitNets,
+} from './balances';
 
 describe('computeNets', () => {
   it('credits the payer and debits the participants', () => {
@@ -197,5 +205,67 @@ describe('suggestSettlements', () => {
       after.set(t.to, after.get(t.to)! - t.cents);
     }
     for (const [, v] of after) expect(v).toBe(0);
+  });
+});
+
+describe('currency conversion for balances', () => {
+  const euroDinner = {
+    paid_by: 'alice',
+    amount_cents: 3000, // €30
+    payers: [
+      { member: 'alice', cents: 2000 },
+      { member: 'bob', cents: 1000 },
+    ],
+    split: {
+      entries: [
+        { member: 'alice', cents: 1000 },
+        { member: 'bob', cents: 1000 },
+        { member: 'carol', cents: 1000 },
+      ],
+    },
+    currency: 'EUR',
+    fx_cents: 3301, // $33.01 — odd on purpose to exercise rounding
+  };
+
+  it('passes same-currency expenses through untouched', () => {
+    const e = { ...euroDinner, currency: 'USD', fx_cents: 0 };
+    expect(expenseForBalance(e, 'USD')).toEqual({
+      paidBy: 'alice',
+      amountCents: 3000,
+      payers: e.payers,
+      entries: e.split.entries,
+    });
+    expect(expenseGroupCents(e, 'USD')).toBe(3000);
+  });
+
+  it('treats an empty currency as the group currency', () => {
+    const e = { ...euroDinner, currency: '', fx_cents: 0 };
+    expect(expenseGroupCents(e, 'USD')).toBe(3000);
+  });
+
+  it('rescales both payers and entries to the converted total', () => {
+    const converted = expenseForBalance(euroDinner, 'USD');
+    expect(converted.amountCents).toBe(3301);
+    expect(converted.payers!.reduce((a, p) => a + p.cents, 0)).toBe(3301);
+    expect(converted.entries.reduce((a, en) => a + en.cents, 0)).toBe(3301);
+  });
+
+  it('converted expenses still net to zero', () => {
+    const nets = computeNets([expenseForBalance(euroDinner, 'USD')], []);
+    let sum = 0;
+    for (const [, v] of nets) sum += v;
+    expect(sum).toBe(0);
+    expect(nets.get('carol')).toBeLessThan(0);
+  });
+
+  it('falls back 1:1 when a foreign expense is missing its conversion', () => {
+    const e = { ...euroDinner, fx_cents: 0 };
+    expect(expenseGroupCents(e, 'USD')).toBe(3000);
+  });
+
+  it('applies the same rule to payments', () => {
+    expect(paymentGroupCents({ amount_cents: 1000, currency: 'EUR', fx_cents: 1100 }, 'USD')).toBe(1100);
+    expect(paymentGroupCents({ amount_cents: 1000, currency: 'USD', fx_cents: 0 }, 'USD')).toBe(1000);
+    expect(paymentGroupCents({ amount_cents: 1000 }, 'USD')).toBe(1000);
   });
 });

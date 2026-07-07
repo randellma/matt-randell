@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
-import { aggregateUnits, computeNets } from '../lib/balances';
-import { formatCents } from '../lib/money';
+import { aggregateUnits, computeNets, expenseForBalance, paymentGroupCents } from '../lib/balances';
+import { detectCurrency, formatMoney } from '../lib/currency';
 import { collectiveInitials } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
+import { CurrencySelect } from '../components/CurrencySelect';
 import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
 
 interface GroupSummary {
   memberCount: number;
   expenseCount: number;
   balanceCents?: number;
+  currency: string;
 }
 
 /** Fetches member/expense counts and your net position for each joined group, best-effort. */
@@ -20,18 +22,24 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
   useEffect(() => {
     let cancelled = false;
     for (const g of groups) {
-      Promise.all([api.listMembers(g.id, g.t), api.listExpenses(g.id, g.t), api.listPayments(g.id, g.t)])
-        .then(([members, expenses, payments]) => {
+      Promise.all([
+        api.getGroup(g.id, g.t),
+        api.listMembers(g.id, g.t),
+        api.listExpenses(g.id, g.t),
+        api.listPayments(g.id, g.t),
+      ])
+        .then(([group, members, expenses, payments]) => {
           if (cancelled) return;
+          const currency = group.currency || 'USD';
           const nets = computeNets(
-            expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
-            payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
+            expenses.map(e => expenseForBalance(e, currency)),
+            payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, currency) })),
           );
           const units = aggregateUnits(nets, members);
           const myUnit = g.memberId ? units.find(u => u.memberIds.includes(g.memberId!)) : undefined;
           setSummaries(s => ({
             ...s,
-            [g.id]: { memberCount: members.length, expenseCount: expenses.length, balanceCents: myUnit?.cents },
+            [g.id]: { memberCount: members.length, expenseCount: expenses.length, balanceCents: myUnit?.cents, currency },
           }));
         })
         .catch(() => {
@@ -82,7 +90,7 @@ export function Home() {
                     {s?.balanceCents !== undefined && s.balanceCents !== 0 && (
                       <span class="group-balance">
                         <b class={`num ${s.balanceCents > 0 ? 'pos' : 'neg'}`}>
-                          {s.balanceCents > 0 ? '+' : '-'}{formatCents(Math.abs(s.balanceCents))}
+                          {s.balanceCents > 0 ? '+' : '-'}{formatMoney(Math.abs(s.balanceCents), s.currency)}
                         </b>
                         <span>{s.balanceCents > 0 ? "you're owed" : 'you owe'}</span>
                       </span>
@@ -179,6 +187,9 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
   const [name, setName] = useState('');
   const [membersText, setMembersText] = useState('');
   const [myName, setMyName] = useState('');
+  // Group currency defaults to wherever this device seems to live.
+  const [currency, setCurrency] = useState(detectCurrency);
+  const [expenseCurrency, setExpenseCurrency] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -199,7 +210,12 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
     setError('');
     try {
       const token = newToken();
-      const group = await api.createGroup(name.trim(), token);
+      const group = await api.createGroup(
+        name.trim(),
+        token,
+        currency,
+        expenseCurrency === currency ? '' : expenseCurrency,
+      );
       let myId: string | undefined;
       for (const n of memberNames) {
         const m = await api.addMember(group.id, n, token);
@@ -233,6 +249,20 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
           placeholder={'Matt\nSarah\nDad'}
         />
       </label>
+      <div class="field-row">
+        <label class="field grow">
+          <span>Settle up in</span>
+          <CurrencySelect value={currency} onChange={setCurrency} />
+        </label>
+        <label class="field grow">
+          <span>Expenses usually in</span>
+          <CurrencySelect
+            value={expenseCurrency}
+            onChange={setExpenseCurrency}
+            emptyLabel={`Same (${currency})`}
+          />
+        </label>
+      </div>
       {memberNames.length > 0 && (
         <div class="field">
           <span>Which one is you?</span>

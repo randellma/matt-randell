@@ -1,18 +1,8 @@
-/** All amounts are integer cents. Floating point never touches stored money. */
-
-/** Parse user input like "12", "12.3", "12.34", "$12.34" into cents. Null if invalid. */
-export function parseAmount(input: string): number | null {
-  const cleaned = input.trim().replace(/^\$/, '').replace(/,/g, '');
-  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
-  const [whole, frac = ''] = cleaned.split('.');
-  return Number(whole) * 100 + Number(frac.padEnd(2, '0') || '0');
-}
-
-export function formatCents(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(cents);
-  return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
+/**
+ * All amounts are integers in a currency's minor units ("cents"). Floating
+ * point never touches stored money. Parsing/formatting (which need to know
+ * the currency) live in currency.ts; this module is pure integer arithmetic.
+ */
 
 /**
  * Split `totalCents` proportionally to `weights`, returning integer cents that
@@ -44,4 +34,29 @@ export function allocate(totalCents: number, weights: number[]): number[] {
 /** Split evenly among n participants (weights all 1). */
 export function allocateEven(totalCents: number, count: number): number[] {
   return allocate(totalCents, Array(count).fill(1));
+}
+
+/**
+ * Rescale integer amounts to a new total, keeping proportions and summing
+ * exactly — how a split in one currency becomes the same split in another.
+ * Unlike allocate, entries may be negative (discount lines), so this floors
+ * exact values directly and hands the remainder to the largest fractions.
+ */
+export function rescale(cents: number[], newTotal: number): number[] {
+  if (cents.length === 0) return [];
+  const oldTotal = cents.reduce((a, b) => a + b, 0);
+  if (oldTotal === 0) throw new Error('rescale: amounts must not sum to zero');
+  const exact = cents.map(c => (c * newTotal) / oldTotal);
+  const floors = exact.map(Math.floor);
+  let remainder = newTotal - floors.reduce((a, b) => a + b, 0);
+
+  const byFraction = exact
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (const { i } of byFraction) {
+    if (remainder === 0) break;
+    floors[i]! += 1;
+    remainder -= 1;
+  }
+  return floors;
 }

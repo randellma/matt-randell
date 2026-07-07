@@ -1,8 +1,16 @@
 import { useState } from 'preact/hooks';
 import { api } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
-import { formatCents, parseAmount } from '../lib/money';
-import { aggregateUnits, computeNets, suggestSettlements, unitNets, type UnitBalance } from '../lib/balances';
+import { formatMoney, moneyPlaceholder, parseMoney } from '../lib/currency';
+import {
+  aggregateUnits,
+  computeNets,
+  expenseForBalance,
+  paymentGroupCents,
+  suggestSettlements,
+  unitNets,
+  type UnitBalance,
+} from '../lib/balances';
 import { newToken } from '../identity';
 import { colorForBalance, collectiveInitials } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
@@ -24,10 +32,12 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
 
   const memberById = new Map(members.map(m => [m.id, m]));
   const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
+  const groupCurrency = group.currency || 'USD';
+  const fmt = (cents: number) => formatMoney(cents, groupCurrency);
 
   const nets = computeNets(
-    expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
-    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
+    expenses.map(e => expenseForBalance(e, groupCurrency)),
+    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
   );
   const units = aggregateUnits(nets, members);
   const unitByKey = new Map(units.map(u => [u.key, u]));
@@ -57,7 +67,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
     // the person most in the black receives — keeps internal breakdowns sane.
     const from = [...fromUnit.memberCents].sort((a, b) => a.cents - b.cents)[0]!.member;
     const to = [...toUnit.memberCents].sort((a, b) => b.cents - a.cents)[0]!.member;
-    if (!confirm(`Record that ${unitName(fromUnit)} paid ${unitName(toUnit)} ${formatCents(cents)}?`)) return;
+    if (!confirm(`Record that ${unitName(fromUnit)} paid ${unitName(toUnit)} ${fmt(cents)}?`)) return;
     run(async () => {
       await api.createPayment(
         {
@@ -67,6 +77,8 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
           amount_cents: cents,
           date: `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`,
           note: '',
+          currency: groupCurrency,
+          fx_cents: 0,
         },
         token,
       );
@@ -74,7 +86,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   }
 
   function deletePayment(p: PaymentRecord) {
-    if (!confirm(`Remove payment ${nameOf(p.from_member)} → ${nameOf(p.to_member)} ${formatCents(p.amount_cents)}?`)) return;
+    if (!confirm(`Remove payment ${nameOf(p.from_member)} → ${nameOf(p.to_member)} ${formatMoney(p.amount_cents, p.currency || groupCurrency)}?`)) return;
     run(() => api.deletePayment(p.id, token));
   }
 
@@ -92,7 +104,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                   <div class="balance-line">
                     <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} />
                     <span class="name">{unitName(u)}</span>
-                    <BalanceAmount cents={u.cents} />
+                    <BalanceAmount cents={u.cents} fmt={fmt} />
                   </div>
                   {u.memberIds.length > 1 && (
                     <ul class="party-breakdown">
@@ -101,7 +113,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                           <span class="nm faint">{nameOf(mc.member)}</span>
                           <span class="lead" />
                           <span class="amt" style={{ color: mc.cents < 0 ? 'var(--red)' : 'var(--accent)' }}>
-                            {mc.cents < 0 ? '−' : '+'}{formatCents(Math.abs(mc.cents))}
+                            {mc.cents < 0 ? '−' : '+'}{fmt(Math.abs(mc.cents))}
                           </span>
                         </li>
                       ))}
@@ -128,7 +140,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                       <Avatar initials={collectiveInitials(unitName(from))} color="#B84A38" size={26} />
                       <span class="settle-arrow">→</span>
                       <Avatar initials={collectiveInitials(unitName(to))} color="#0B7A4E" size={26} />
-                      <span>{unitName(from)} pays {unitName(to)} {formatCents(t.cents)}</span>
+                      <span>{unitName(from)} pays {unitName(to)} {fmt(t.cents)}</span>
                     </span>
                     <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
                       Mark paid
@@ -153,7 +165,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
               <li key={p.id}>
                 <span>
                   {p.date.slice(0, 10)} · {nameOf(p.from_member)} → {nameOf(p.to_member)}{' '}
-                  <b>{formatCents(p.amount_cents)}</b>
+                  <b>{formatMoney(p.amount_cents, p.currency || groupCurrency)}</b>
                   {p.note && <span class="payment-note"> · {p.note}</span>}
                 </span>
                 <button class="item-remove" disabled={busy} onClick={() => deletePayment(p)}>
@@ -176,6 +188,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
           units={units}
           unitName={unitName}
           nameOf={nameOf}
+          currency={groupCurrency}
           onClose={() => setRecording(false)}
           onSave={(from_member, to_member, amount_cents, note) => {
             setRecording(false);
@@ -188,6 +201,8 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                   amount_cents,
                   date: `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`,
                   note,
+                  currency: groupCurrency,
+                  fx_cents: 0,
                 },
                 token,
               );
@@ -201,11 +216,11 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   );
 }
 
-function BalanceAmount({ cents }: { cents: number }) {
+function BalanceAmount({ cents, fmt }: { cents: number; fmt: (cents: number) => string }) {
   if (cents === 0) return <span class="stamp">Settled</span>;
   return (
     <span class={`stamp ${cents < 0 ? 'red' : ''}`}>
-      {cents > 0 ? `Gets ${formatCents(cents)}` : `Owes ${formatCents(-cents)}`}
+      {cents > 0 ? `Gets ${fmt(cents)}` : `Owes ${fmt(-cents)}`}
     </span>
   );
 }
@@ -330,12 +345,15 @@ function PaymentSheet({
   units,
   unitName,
   nameOf,
+  currency,
   onSave,
   onClose,
 }: {
   units: UnitBalance[];
   unitName: (u: UnitBalance) => string;
   nameOf: (id: string) => string;
+  /** payments are recorded in the group currency */
+  currency: string;
   onSave: (fromMember: string, toMember: string, cents: number, note: string) => void;
   onClose: () => void;
 }) {
@@ -364,7 +382,7 @@ function PaymentSheet({
     }));
   const byKey = new Map([...memberOptions, ...partyOptions].map(o => [o.key, o]));
 
-  const cents = parseAmount(amountText);
+  const cents = parseMoney(amountText, currency);
   const fromMember = from ? byKey.get(from)!.resolve('from') : '';
   const toMember = to ? byKey.get(to)!.resolve('to') : '';
   const samePerson = !!fromMember && fromMember === toMember;
@@ -404,11 +422,11 @@ function PaymentSheet({
         </div>
         <div class="field-row">
           <label class="field grow">
-            <span>Amount</span>
+            <span>Amount ({currency})</span>
             <input
               inputMode="decimal"
               value={amountText}
-              placeholder="0.00"
+              placeholder={moneyPlaceholder(currency)}
               onInput={e => setAmountText((e.target as HTMLInputElement).value)}
             />
           </label>

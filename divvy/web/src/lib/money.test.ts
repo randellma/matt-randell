@@ -1,23 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocate, allocateEven, formatCents, parseAmount } from './money';
-
-describe('parseAmount', () => {
-  it('parses plain dollars', () => expect(parseAmount('12')).toBe(1200));
-  it('parses dollars and cents', () => expect(parseAmount('12.34')).toBe(1234));
-  it('parses one decimal place', () => expect(parseAmount('12.3')).toBe(1230));
-  it('strips $ and commas', () => expect(parseAmount('$1,234.56')).toBe(123456));
-  it('rejects three decimal places', () => expect(parseAmount('1.234')).toBeNull());
-  it('rejects garbage', () => expect(parseAmount('abc')).toBeNull());
-  it('rejects empty', () => expect(parseAmount('')).toBeNull());
-  it('rejects negative (expenses are positive)', () => expect(parseAmount('-5')).toBeNull());
-});
-
-describe('formatCents', () => {
-  it('formats', () => expect(formatCents(1234)).toBe('$12.34'));
-  it('pads cents', () => expect(formatCents(1205)).toBe('$12.05'));
-  it('formats zero', () => expect(formatCents(0)).toBe('$0.00'));
-  it('formats negative', () => expect(formatCents(-99)).toBe('-$0.99'));
-});
+import { allocate, allocateEven, rescale } from './money';
 
 describe('allocate', () => {
   it('splits exactly when divisible', () => {
@@ -56,5 +38,38 @@ describe('allocate', () => {
 describe('allocateEven', () => {
   it('splits a dinner bill', () => {
     expect(allocateEven(10001, 2)).toEqual([5001, 5000]);
+  });
+});
+
+describe('rescale', () => {
+  it('converts a split to a new total exactly', () => {
+    // €30 split 10/20 becomes $33 split 11/22
+    expect(rescale([1000, 2000], 3300)).toEqual([1100, 2200]);
+  });
+  it('always sums to the new total', () => {
+    for (let target = 1; target < 250; target++) {
+      const parts = rescale([333, 334, 333], target);
+      expect(parts.reduce((a, b) => a + b, 0)).toBe(target);
+    }
+  });
+  it('keeps proportions under awkward rates', () => {
+    const parts = rescale([999, 1], 1087);
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(1087);
+    expect(parts[0]).toBeGreaterThan(parts[1]!);
+  });
+  it('carries negative entries (discounts) through', () => {
+    const parts = rescale([1500, -500], 2000);
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(2000);
+    expect(parts[1]).toBeLessThan(0);
+  });
+  it('handles shrinking totals (converting to a stronger currency)', () => {
+    const parts = rescale([1000, 1000, 1000], 7);
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(7);
+  });
+  it('returns empty for no entries', () => {
+    expect(rescale([], 100)).toEqual([]);
+  });
+  it('throws when the source sums to zero', () => {
+    expect(() => rescale([500, -500], 100)).toThrow();
   });
 });

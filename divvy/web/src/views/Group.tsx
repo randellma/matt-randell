@@ -2,13 +2,21 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord } from '../api';
 import { getJoinedGroup, rememberGroup } from '../identity';
-import { aggregateUnits, computeNets } from '../lib/balances';
-import { formatCents } from '../lib/money';
+import {
+  aggregateUnits,
+  computeNets,
+  expenseForBalance,
+  expenseGroupCents,
+  paymentGroupCents,
+  type ExpenseForBalance,
+} from '../lib/balances';
+import { formatMoney } from '../lib/currency';
 import { partyDisplayName } from '../lib/party';
 import { colorForId, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
+import { GroupSettings } from './GroupSettings';
 
 interface Props {
   groupId: string;
@@ -84,6 +92,25 @@ export function Group({ groupId, token, sub }: Props) {
     );
   }
 
+  if (sub[0] === 'settings') {
+    return (
+      <GroupSettings
+        group={group}
+        token={token}
+        members={members}
+        me={me!}
+        onMeChange={memberId => {
+          rememberGroup({ id: group.id, t: token, name: group.name, memberId });
+          setMe(memberId);
+        }}
+        onDone={changed => {
+          navigate(groupPath(groupId, token));
+          if (changed) reload();
+        }}
+      />
+    );
+  }
+
   if (sub[0] === 'new' || (sub[0] === 'e' && sub[1])) {
     const editing = sub[0] === 'e' ? expenses.find(x => x.id === sub[1]) : undefined;
     return (
@@ -121,8 +148,12 @@ export function Group({ groupId, token, sub }: Props) {
         <button class="back" onClick={() => navigate('/')}>‹</button>
         <div class="group-title">
           <h1>{group.name}</h1>
-          <button class="me-chip" title="Switch who you are" onClick={() => setMe(undefined)}>
-            Receipt #{receiptNumber(group.id)} · You: {memberById.get(me!)?.name}
+          <button
+            class="me-chip"
+            title="Group settings"
+            onClick={() => navigate(groupPath(groupId, token, '/settings'))}
+          >
+            Receipt #{receiptNumber(group.id)} · You: {memberById.get(me!)?.name} ›
           </button>
         </div>
         <button class="btn small" onClick={share}>
@@ -141,10 +172,11 @@ export function Group({ groupId, token, sub }: Props) {
 
       {tab === 'expenses' ? (
         <>
-          <WalletSummary expenses={expenses} payments={payments} members={members} me={me!} />
+          <WalletSummary group={group} expenses={expenses} payments={payments} members={members} me={me!} />
           <div class="seclbl left">Recent expenses</div>
           <ExpenseList
             expenses={expenses}
+            groupCurrency={group.currency || 'USD'}
             memberById={memberById}
             memberCount={members.length}
             groupId={groupId}
@@ -185,20 +217,24 @@ function receiptNumber(id: string): string {
  * group (sum of what creditors are owed), and where you personally stand.
  */
 function WalletSummary({
+  group,
   expenses,
   payments,
   members,
   me,
 }: {
+  group: GroupRecord;
   expenses: ExpenseRecord[];
   payments: PaymentRecord[];
   members: MemberRecord[];
   me: string;
 }) {
-  const totalSpent = expenses.reduce((a, e) => a + e.amount_cents, 0);
+  const groupCurrency = group.currency || 'USD';
+  const fmt = (cents: number) => formatMoney(cents, groupCurrency);
+  const totalSpent = expenses.reduce((a, e) => a + expenseGroupCents(e, groupCurrency), 0);
   const nets = computeNets(
-    expenses.map(e => ({ paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries })),
-    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: p.amount_cents })),
+    expenses.map(e => expenseForBalance(e, groupCurrency)),
+    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
   );
   const units = aggregateUnits(nets, members);
   const unsettled = units.reduce((a, u) => a + Math.max(0, u.cents), 0);
@@ -214,11 +250,11 @@ function WalletSummary({
       <div class="wallet-summary">
         <div class="subline">Your running balance{partySuffix}</div>
         <span class={`stamp big ${mine < 0 ? 'red' : ''}`}>
-          {mine === 0 ? "You're settled up" : mine > 0 ? `You're owed ${formatCents(mine)}` : `You owe ${formatCents(-mine)}`}
+          {mine === 0 ? "You're settled up" : mine > 0 ? `You're owed ${fmt(mine)}` : `You owe ${fmt(-mine)}`}
         </span>
         <div class="wallet-stats">
-          <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{formatCents(totalSpent)}</span></div>
-          <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{formatCents(unsettled)}</span></div>
+          <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{fmt(totalSpent)}</span></div>
+          <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{fmt(unsettled)}</span></div>
         </div>
       </div>
       <hr class="rule" />
@@ -226,19 +262,20 @@ function WalletSummary({
   );
 }
 
-/** What this expense did to `me`'s balance: what I paid in, minus what I owe of it. */
-function myDelta(e: ExpenseRecord, me: string): number {
+/** What this expense did to `me`'s balance (in group currency): paid in, minus owed. */
+function myDelta(e: ExpenseForBalance, me: string): number {
   const paid = e.payers?.length
     ? (e.payers.find(p => p.member === me)?.cents ?? 0)
-    : e.paid_by === me
-      ? e.amount_cents
+    : e.paidBy === me
+      ? e.amountCents
       : 0;
-  const owed = e.split.entries.find(en => en.member === me)?.cents ?? 0;
+  const owed = e.entries.find(en => en.member === me)?.cents ?? 0;
   return paid - owed;
 }
 
 function ExpenseList({
   expenses,
+  groupCurrency,
   memberById,
   memberCount,
   groupId,
@@ -246,6 +283,7 @@ function ExpenseList({
   me,
 }: {
   expenses: ExpenseRecord[];
+  groupCurrency: string;
   memberById: Map<string, { name: string }>;
   memberCount: number;
   groupId: string;
@@ -267,7 +305,8 @@ function ExpenseList({
     <>
       <ul class="expense-list">
         {expenses.map((e, i) => {
-          const delta = myDelta(e, me);
+          const delta = myDelta(expenseForBalance(e, groupCurrency), me);
+          const currency = e.currency || groupCurrency;
           const people = e.split.entries.map(en => ({
             id: en.member,
             initials: personInitial(nameOf(en.member)),
@@ -285,10 +324,15 @@ function ExpenseList({
                   </span>
                 </div>
                 <span class="expense-amount-col">
-                  <span class="expense-amount num">{formatCents(e.amount_cents)}</span>
+                  <span class="expense-amount num">{formatMoney(e.amount_cents, currency)}</span>
+                  {currency !== groupCurrency && (
+                    <span class="expense-fx num muted">
+                      ≈ {formatMoney(expenseGroupCents(e, groupCurrency), groupCurrency)}
+                    </span>
+                  )}
                   {delta !== 0 && (
                     <span class={`expense-delta num ${delta > 0 ? 'pos' : 'neg'}`}>
-                      {delta > 0 ? '+' : '-'}{formatCents(Math.abs(delta))} you
+                      {delta > 0 ? '+' : '-'}{formatMoney(Math.abs(delta), groupCurrency)} you
                     </span>
                   )}
                 </span>

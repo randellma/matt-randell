@@ -6,6 +6,10 @@ export interface GroupRecord {
   id: string;
   name: string;
   t: string;
+  /** group currency: what Balances/settle-up report in. '' on old groups = USD */
+  currency: string;
+  /** default currency for new expenses; '' = same as `currency` */
+  expense_currency: string;
 }
 
 export interface MemberRecord {
@@ -50,6 +54,10 @@ export interface ExpenseRecord {
   split: SplitData;
   receipt: string;
   notes: string;
+  /** the expense's own currency; '' / absent = the group currency */
+  currency?: string;
+  /** amount in group-currency minor units when `currency` is foreign; 0 otherwise */
+  fx_cents?: number;
 }
 
 export interface PaymentRecord {
@@ -60,6 +68,10 @@ export interface PaymentRecord {
   amount_cents: number;
   date: string;
   note: string;
+  /** the payment's own currency; '' / absent = the group currency */
+  currency?: string;
+  /** amount in group-currency minor units when `currency` is foreign; 0 otherwise */
+  fx_cents?: number;
 }
 
 export interface ReceiptRecord {
@@ -80,12 +92,27 @@ export class DivvyApi {
     this.pb.autoCancellation(false);
   }
 
-  async createGroup(name: string, token: string): Promise<GroupRecord> {
-    return this.pb.collection('groups').create({ name, t: token });
+  async createGroup(
+    name: string,
+    token: string,
+    currency: string,
+    expenseCurrency: string,
+  ): Promise<GroupRecord> {
+    return this.pb
+      .collection('groups')
+      .create({ name, t: token, currency, expense_currency: expenseCurrency });
   }
 
   async getGroup(id: string, t: string): Promise<GroupRecord> {
     return this.pb.collection('groups').getOne(id, { query: { t } });
+  }
+
+  async updateGroup(
+    id: string,
+    data: Partial<Pick<GroupRecord, 'name' | 'currency' | 'expense_currency'>>,
+    t: string,
+  ): Promise<GroupRecord> {
+    return this.pb.collection('groups').update(id, data, { query: { t } });
   }
 
   async listMembers(groupId: string, t: string): Promise<MemberRecord[]> {
@@ -127,6 +154,23 @@ export class DivvyApi {
 
   async deleteExpense(id: string, t: string): Promise<void> {
     await this.pb.collection('expenses').delete(id, { query: { t } });
+  }
+
+  /** Partial update — used by settings to rewrite currency/fx after a group currency change. */
+  async patchExpense(
+    id: string,
+    data: Partial<Pick<ExpenseRecord, 'currency' | 'fx_cents'>>,
+    t: string,
+  ): Promise<ExpenseRecord> {
+    return this.pb.collection('expenses').update(id, data, { query: { t } });
+  }
+
+  async patchPayment(
+    id: string,
+    data: Partial<Pick<PaymentRecord, 'currency' | 'fx_cents'>>,
+    t: string,
+  ): Promise<PaymentRecord> {
+    return this.pb.collection('payments').update(id, data, { query: { t } });
   }
 
   async listPayments(groupId: string, t: string): Promise<PaymentRecord[]> {

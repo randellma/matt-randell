@@ -1,3 +1,4 @@
+import { rescale } from './money';
 import type { SplitEntry } from './split';
 
 export interface ExpenseForBalance {
@@ -12,6 +13,60 @@ export interface PaymentForBalance {
   from: string;
   to: string;
   cents: number;
+}
+
+/** The currency-relevant subset of an expense record as stored. */
+interface ExpenseRecordLike {
+  paid_by: string;
+  amount_cents: number;
+  payers?: { member: string; cents: number }[];
+  split: { entries: SplitEntry[] };
+  /** '' / absent means the group currency */
+  currency?: string;
+  /** amount in group-currency minor units when `currency` is foreign */
+  fx_cents?: number;
+}
+
+/**
+ * An expense's total in group-currency minor units. Foreign expenses use the
+ * stored conversion; a foreign expense missing one (shouldn't happen, but
+ * offline edits can) counts 1:1 rather than dropping money.
+ */
+export function expenseGroupCents(e: ExpenseRecordLike, groupCurrency: string): number {
+  const foreign = e.currency && e.currency !== groupCurrency;
+  return foreign ? e.fx_cents || e.amount_cents : e.amount_cents;
+}
+
+/** Same rule for payments, which store the identical currency/fx_cents pair. */
+export function paymentGroupCents(
+  p: { amount_cents: number; currency?: string; fx_cents?: number },
+  groupCurrency: string,
+): number {
+  const foreign = p.currency && p.currency !== groupCurrency;
+  return foreign ? p.fx_cents || p.amount_cents : p.amount_cents;
+}
+
+function rescaleEntries<T extends { cents: number }>(list: T[], newTotal: number): T[] {
+  const scaled = rescale(list.map(x => x.cents), newTotal);
+  return list.map((x, i) => ({ ...x, cents: scaled[i]! }));
+}
+
+/**
+ * An expense record as computeNets wants it: payer credits and split debits
+ * in group-currency minor units. Foreign expenses rescale both sides to the
+ * converted total, so credits and debits still cancel exactly.
+ */
+export function expenseForBalance(e: ExpenseRecordLike, groupCurrency: string): ExpenseForBalance {
+  const total = expenseGroupCents(e, groupCurrency);
+  if (total === e.amount_cents) {
+    return { paidBy: e.paid_by, amountCents: e.amount_cents, payers: e.payers, entries: e.split.entries };
+  }
+  return {
+    paidBy: e.paid_by,
+    amountCents: total,
+    payers: e.payers?.length ? rescaleEntries(e.payers, total) : undefined,
+    entries: rescaleEntries(e.split.entries, total),
+  };
 }
 
 export interface Transfer {
