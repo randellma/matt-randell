@@ -28,6 +28,16 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(key: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   const memberById = new Map(members.map(m => [m.id, m]));
   const nameOf = (id: string) => memberById.get(id)?.name ?? '?';
@@ -106,12 +116,18 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
               <li key={u.key}>
                 {i > 0 && <hr class="rule" style="margin-bottom:16px;" />}
                 <div class="balance-unit">
-                  <div class="balance-line">
+                  <div
+                    class={`balance-line ${u.memberIds.length > 1 ? 'expandable' : ''}`}
+                    onClick={u.memberIds.length > 1 ? () => toggleExpanded(u.key) : undefined}
+                  >
                     <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} src={unitPhoto(u)} />
                     <span class="name">{unitName(u)}</span>
+                    {u.memberIds.length > 1 && (
+                      <span class={`caret ${expanded.has(u.key) ? 'open' : ''}`}>▾</span>
+                    )}
                     <BalanceAmount cents={u.cents} fmt={fmt} />
                   </div>
-                  {u.memberIds.length > 1 && (
+                  {u.memberIds.length > 1 && expanded.has(u.key) && (
                     <ul class="party-breakdown">
                       {u.memberCents.map(mc => (
                         <li key={mc.member} class="li">
