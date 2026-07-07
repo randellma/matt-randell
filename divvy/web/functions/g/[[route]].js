@@ -38,7 +38,16 @@ async function fetchGroupPreview(pbUrl, id, t) {
   if (!groupRes.ok) return null;
   const group = await groupRes.json();
   const members = membersRes.ok ? (await membersRes.json()).items ?? [] : [];
-  return { name: group.name, memberNames: members.map((m) => m.name) };
+  return { name: group.name, photo: group.photo, memberNames: members.map((m) => m.name) };
+}
+
+/** Cache-buster for the dynamic card: changes when the photo or name does. */
+async function cardVersion(preview) {
+  const bytes = new TextEncoder().encode(`${preview.photo}|${preview.name}`);
+  const digest = await crypto.subtle.digest('SHA-1', bytes);
+  return [...new Uint8Array(digest).slice(0, 6)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export async function onRequestGet({ request, env, params }) {
@@ -59,13 +68,18 @@ export async function onRequestGet({ request, env, params }) {
   const description =
     memberBlurb(preview.memberNames) +
     'Tap to see the group and add your expenses — no app, no sign-up.';
+  // Groups with a photo get a card with the avatar composited in (rendered by
+  // functions/og/g/[[route]].js); the rest share the static branded card.
+  const image = preview.photo
+    ? new URL(`/og/g/${encodeURIComponent(id)}/${encodeURIComponent(t)}/card.png?v=${await cardVersion(preview)}`, request.url).href
+    : new URL('/og-card.png', request.url).href;
   const og = `
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Divvy" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:url" content="${escapeHtml(new URL(request.url).origin + `/g/${id}/${t}`)}" />
-  <meta property="og:image" content="${escapeHtml(new URL('/og-card.png', request.url).href)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />

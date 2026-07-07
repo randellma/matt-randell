@@ -5,12 +5,13 @@
  * browser can't decode it.
  */
 /**
- * Center-crop a photo to a small square JPEG for an avatar. Avatars render at
- * 44px and below, so 256px leaves plenty of headroom for retina screens while
- * keeping uploads a few KB. Falls back to the original file if the browser
- * can't decode it.
+ * Center-crop a photo to a small square JPEG for an avatar. In the app,
+ * avatars render at 44px and below, but a group's avatar is also drawn at
+ * ~300px on the link-preview card (og/card.js), so 512px keeps that sharp
+ * while still keeping uploads small. Falls back to the original file if the
+ * browser can't decode it.
  */
-export async function prepareAvatarImage(file: File, edge = 256): Promise<Blob> {
+export async function prepareAvatarImage(file: File, edge = 512): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
     const crop = Math.min(bitmap.width, bitmap.height);
