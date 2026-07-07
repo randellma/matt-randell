@@ -216,21 +216,29 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 .group-balance span { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.1em; }
 
 /* group header */
-.group-header { display: flex; align-items: center; gap: 6px; }
+.group-header { display: flex; align-items: center; gap: 10px; }
 .back { width: auto; font-size: 20px; color: var(--faint); line-height: 1; padding: 2px 4px 2px 0; }
-.group-title { flex: 1; min-width: 0; }
-.group-title h1 { font-weight: 700; font-size: 1.15rem; letter-spacing: 0.04em; color: var(--ink); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* the settings chip under the group title — dashed border marks it tappable,
+.group-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.group-header-text h1 { font-weight: 700; font-size: 1.15rem; letter-spacing: 0.04em; color: var(--ink); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-header-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* the settings chip — dashed border marks it tappable,
    matching the ticket-button language used elsewhere on the receipt */
 .me-chip {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: 5px;
+  display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.64rem; font-weight: 700; color: var(--faint);
   letter-spacing: 0.08em; text-transform: uppercase;
   border: 1.5px dashed var(--line); border-radius: 5px; padding: 4px 9px;
-  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .me-chip svg { flex: none; }
 .me-chip:active { background: var(--paper2); }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  font-size: 0.64rem; font-weight: 700; color: var(--faint);
+  border: 1.5px dashed var(--line); border-radius: 5px; padding: 4px 9px;
+  background: var(--paper); cursor: pointer; transition: 0.12s;
+}
+.icon-btn:active { background: var(--paper2); }
 
 /* tabs */
 .tabs { display: flex; gap: 0; border: 2px solid var(--ink); border-radius: 5px; overflow: hidden; }
