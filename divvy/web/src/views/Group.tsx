@@ -132,7 +132,9 @@ export function Group({ groupId, token, sub }: Props) {
   }
 
   async function share() {
-    const url = `${location.origin}/${groupPath(group!.id, token)}`;
+    // Path form (not the hash route) so the server can serve a per-group
+    // link-preview card to messaging-app crawlers.
+    const url = `${location.origin}/g/${group!.id}/${token}`;
     const data = { title: `Divvy: ${group!.name}`, text: `Join our expense group "${group!.name}"`, url };
     if (navigator.share) {
       try {

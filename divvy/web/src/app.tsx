@@ -13,6 +13,15 @@ export function navigate(path: string): void {
   location.hash = path;
 }
 
+// Share links use a real path (/g/:id/:t) so the server can inject a link
+// preview for that group (see functions/g/[[route]].js); the app itself lives
+// on hash routes. Normalize before mounting — also covers the offline case
+// where the service worker answers a path navigation with the cached shell.
+{
+  const m = location.pathname.match(/^\/g\/([^/]+)\/([^/]+)/);
+  if (m && !location.hash) history.replaceState(null, '', `/#/g/${m[1]}/${m[2]}`);
+}
+
 export function groupPath(id: string, t: string, sub = ''): string {
   return `#/g/${id}/${t}${sub}`;
 }
