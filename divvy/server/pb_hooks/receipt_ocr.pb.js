@@ -28,8 +28,9 @@ onRecordAfterCreateSuccess((e) => {
 
     const filename = receipt.getString("image");
     const path = [e.app.dataDir(), "storage", receipt.baseFilesPath(), filename].join("/");
-    const imageB64 = utils.base64Encode($os.readFile(path));
-    const mediaType = utils.mediaTypeFor(filename);
+    const fileBytes = $os.readFile(path);
+    const fileB64 = utils.base64Encode(fileBytes);
+    const mediaType = utils.mediaTypeFor(filename, fileBytes);
 
     const base = $os.getenv("DIVVY_OCR_API_BASE") || "https://api.anthropic.com";
     const model = $os.getenv("DIVVY_OCR_MODEL") || "claude-haiku-4-5";
@@ -43,7 +44,7 @@ onRecordAfterCreateSuccess((e) => {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(utils.buildRequest(model, mediaType, imageB64)),
+      body: JSON.stringify(utils.buildRequest(model, mediaType, fileB64)),
     });
 
     if (res.statusCode !== 200) {

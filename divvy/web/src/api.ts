@@ -313,8 +313,8 @@ export class DivvyApi {
    * hook runs during this request, so the returned record is usually already
    * done/failed — but poll to be safe.
    */
-  async uploadReceipt(groupId: string, file: Blob, t: string): Promise<ReceiptRecord> {
-    return this.createReceipt(groupId, file, 'pending', t);
+  async uploadReceipt(groupId: string, file: Blob, isPdf: boolean, t: string): Promise<ReceiptRecord> {
+    return this.createReceipt(groupId, file, isPdf, 'pending', t);
   }
 
   /**
@@ -322,21 +322,23 @@ export class DivvyApi {
    * hook only parses records created with status 'pending', so starting at
    * 'done' stores the file and nothing else.
    */
-  async uploadReceiptImage(groupId: string, file: Blob, t: string): Promise<ReceiptRecord> {
-    return this.createReceipt(groupId, file, 'done', t);
+  async uploadReceiptImage(groupId: string, file: Blob, isPdf: boolean, t: string): Promise<ReceiptRecord> {
+    return this.createReceipt(groupId, file, isPdf, 'done', t);
   }
 
   private async createReceipt(
     groupId: string,
     file: Blob,
+    // caller sniffs this (isPdfFile) — blob.type alone lies on iOS
+    isPdf: boolean,
     status: 'pending' | 'done',
     t: string,
   ): Promise<ReceiptRecord> {
     const form = new FormData();
     form.set('group', groupId);
     form.set('status', status);
-    // The extension is what the OCR hook keys its media type off.
-    form.set('image', file, file.type === 'application/pdf' ? 'receipt.pdf' : 'receipt.jpg');
+    // The extension is what receiptIsPdf and the OCR hook key off.
+    form.set('image', file, isPdf ? 'receipt.pdf' : 'receipt.jpg');
     return this.pb.collection('receipts').create(form, { query: { t } });
   }
 

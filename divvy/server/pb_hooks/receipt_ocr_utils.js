@@ -28,7 +28,20 @@ function base64Encode(bytes) {
   return out.join("");
 }
 
-function mediaTypeFor(filename) {
+/**
+ * Media type from the file's magic bytes when they're conclusive (a PDF
+ * mis-uploaded with an image name must still go to the API as a document),
+ * falling back to the extension.
+ */
+function mediaTypeFor(filename, bytes) {
+  // "%PDF-"
+  if (
+    bytes && bytes.length >= 5 &&
+    bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 &&
+    bytes[3] === 0x46 && bytes[4] === 0x2d
+  ) {
+    return "application/pdf";
+  }
   const lower = filename.toLowerCase();
   if (lower.endsWith(".pdf")) return "application/pdf";
   if (lower.endsWith(".png")) return "image/png";

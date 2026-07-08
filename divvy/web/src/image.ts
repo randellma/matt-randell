@@ -35,6 +35,18 @@ export async function prepareAvatarImage(file: File, edge = 512): Promise<Blob> 
   return file;
 }
 
+/**
+ * True when the file is really a PDF. Checks the magic bytes rather than
+ * trusting `file.type` — iOS pickers and share sheets sometimes hand over
+ * files with an empty or generic MIME type.
+ */
+export async function isPdfFile(file: Blob): Promise<boolean> {
+  if (file.type === 'application/pdf') return true;
+  if (file.type.startsWith('image/')) return false;
+  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  return String.fromCharCode(...head) === '%PDF-';
+}
+
 export async function prepareReceiptImage(file: File, maxEdge = 1800): Promise<Blob> {
   // PDFs (emailed receipts) can't be rasterized here and the OCR model reads
   // them natively — upload as-is.

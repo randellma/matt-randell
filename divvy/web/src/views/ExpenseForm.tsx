@@ -18,10 +18,11 @@ import { fetchRate } from '../lib/fx';
 import { groupParties, partyDisplayName } from '../lib/party';
 import { computeEven, computePercent, computeShares, type SplitEntry, type SplitMode } from '../lib/split';
 import { computeItemized, type AssignedItem } from '../lib/receipt';
-import { prepareReceiptImage } from '../image';
+import { isPdfFile, prepareReceiptImage } from '../image';
 import { colorForId, personInitial } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
+import { PdfPages, PdfThumb } from '../components/PdfViewer';
 
 interface Props {
   group: GroupRecord;
@@ -176,21 +177,17 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
   // Photos get re-encoded well under the server's 15MB cap; PDFs upload as-is,
   // so oversized ones are turned away with a real message instead of a 400.
-  function pdfTooBig(file: File): boolean {
-    if (file.type === 'application/pdf' && file.size > 15 * 1024 * 1024) {
-      setError('That PDF is over 15MB — too big to attach.');
-      return true;
-    }
-    return false;
-  }
+  const PDF_TOO_BIG = 'That PDF is over 15MB — too big to attach.';
+  const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
   async function attachReceipt(file: File) {
-    if (pdfTooBig(file)) return;
     setAttachState('working');
     setError('');
     try {
-      const image = await prepareReceiptImage(file);
-      const rec = await api.uploadReceiptImage(group.id, image, token);
+      const isPdf = await isPdfFile(file);
+      if (isPdf && file.size > MAX_PDF_BYTES) throw new Error(PDF_TOO_BIG);
+      const blob = isPdf ? file : await prepareReceiptImage(file);
+      const rec = await api.uploadReceiptImage(group.id, blob, isPdf, token);
       setReceiptRec(rec);
       setReceiptGone(false);
       setReceiptId(rec.id);
@@ -349,12 +346,13 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const owesEntries = mode === 'percent' ? percentDisplayEntries : (preview.entries ?? null);
 
   async function scanReceipt(file: File) {
-    if (pdfTooBig(file)) return;
     setScanState('working');
     setError('');
     try {
-      const image = await prepareReceiptImage(file);
-      const created = await api.uploadReceipt(group.id, image, token);
+      const isPdf = await isPdfFile(file);
+      if (isPdf && file.size > MAX_PDF_BYTES) throw new Error(PDF_TOO_BIG);
+      const blob = isPdf ? file : await prepareReceiptImage(file);
+      const created = await api.uploadReceipt(group.id, blob, isPdf, token);
       const receipt = await api.waitForReceipt(created.id, token);
       if (receipt.status === 'failed' || !receipt.parsed) {
         throw new Error(receipt.error || 'Receipt parsing failed');
@@ -557,27 +555,27 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <div class="receipt-row">
               {receiptRec ? (
                 <>
-                  {receiptIsPdf(receiptRec) ? (
-                    // PocketBase can't thumbnail a PDF, so this is a paper-doc
-                    // chip; tapping opens the browser's own PDF viewer.
-                    <a
-                      class="receipt-thumb pdf"
-                      title="View receipt"
-                      href={api.receiptImageUrl(receiptRec)}
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      PDF
-                    </a>
-                  ) : (
-                    <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
+                  <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
+                    {receiptIsPdf(receiptRec) ? (
+                      // PocketBase can't thumbnail a PDF — pdf.js draws page 1,
+                      // with a paper-doc icon standing in until (or unless) it does.
+                      <PdfThumb
+                        url={api.receiptImageUrl(receiptRec)!}
+                        height={56}
+                        fallback={
+                          <span class="pdf-fallback">
+                            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            PDF
+                          </span>
+                        }
+                      />
+                    ) : (
                       <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
-                    </button>
-                  )}
+                    )}
+                  </button>
                   <span class="receipt-note">Tap to view</span>
                 </>
               ) : (
@@ -759,7 +757,25 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
       {receiptOpen && receiptRec && (
         <div class="lightbox" onClick={() => setReceiptOpen(false)}>
-          <img src={api.receiptImageUrl(receiptRec)} alt="Receipt" />
+          {receiptIsPdf(receiptRec) ? (
+            <>
+              <div class="lightbox-pdf" onClick={e => e.stopPropagation()}>
+                <PdfPages url={api.receiptImageUrl(receiptRec)!} />
+              </div>
+              <a
+                class="lightbox-open"
+                href={api.receiptImageUrl(receiptRec)}
+                target="_blank"
+                rel="noopener"
+                title="Open in a new tab"
+                onClick={e => e.stopPropagation()}
+              >
+                ↗
+              </a>
+            </>
+          ) : (
+            <img src={api.receiptImageUrl(receiptRec)} alt="Receipt" />
+          )}
           <button class="lightbox-close" aria-label="Close">×</button>
         </div>
       )}
