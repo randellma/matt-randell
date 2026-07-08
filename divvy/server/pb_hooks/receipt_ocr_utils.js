@@ -30,6 +30,7 @@ function base64Encode(bytes) {
 
 function mediaTypeFor(filename) {
   const lower = filename.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
@@ -67,25 +68,31 @@ const RECEIPT_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildRequest(model, mediaType, imageB64) {
+function buildRequest(model, mediaType, fileB64) {
+  // Photos go as an `image` block; PDFs (emailed receipts — rides, hotels,
+  // flights) go as a `document` block. Same schema either way.
+  const fileBlock =
+    mediaType === "application/pdf"
+      ? { type: "document", source: { type: "base64", media_type: mediaType, data: fileB64 } }
+      : { type: "image", source: { type: "base64", media_type: mediaType, data: fileB64 } };
   return {
     model: model,
     max_tokens: 4000,
     system:
-      "You transcribe retail and restaurant receipts into structured data. " +
-      "Read the receipt image carefully, including faint or skewed text. " +
+      "You transcribe receipts and invoices into structured data. They may be " +
+      "photos of retail/restaurant receipts or PDF receipts (ride shares, hotels, " +
+      "flights, vacation rentals). Read carefully, including faint or skewed text. " +
       "All money values are integer cents (e.g. $12.34 -> 1234). " +
       "If a quantity line shows unit price and quantity, report the line total. " +
+      "For trip/stay invoices, charges like fares, nightly rates, cleaning or " +
+      "service fees are items; taxes go in tax_cents, not the items. " +
       "Never invent items; if a line is illegible, skip it. " +
       "Report the ISO 4217 currency code the prices are printed in if you can tell from a symbol, code, or other cues; if you can't confidently identify it, use null rather than guessing.",
     messages: [
       {
         role: "user",
         content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: imageB64 },
-          },
+          fileBlock,
           { type: "text", text: "Extract this receipt." },
         ],
       },
@@ -99,7 +106,7 @@ function buildRequest(model, mediaType, imageB64) {
 /** Pull the structured JSON out of a Messages API response. */
 function extractParsed(resJson) {
   if (resJson.stop_reason === "refusal") {
-    throw new Error("Model declined to process this image");
+    throw new Error("Model declined to process this file");
   }
   const textBlock = (resJson.content || []).find((b) => b.type === "text");
   if (!textBlock) {

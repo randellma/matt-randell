@@ -36,6 +36,9 @@ export async function prepareAvatarImage(file: File, edge = 512): Promise<Blob> 
 }
 
 export async function prepareReceiptImage(file: File, maxEdge = 1800): Promise<Blob> {
+  // PDFs (emailed receipts) can't be rasterized here and the OCR model reads
+  // them natively — upload as-is.
+  if (file.type === 'application/pdf') return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));

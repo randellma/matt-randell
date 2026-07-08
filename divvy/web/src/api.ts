@@ -103,10 +103,16 @@ export interface PaymentRecord {
 export interface ReceiptRecord {
   id: string;
   group: string;
+  /** stored file — a photo, or a PDF for emailed receipts (rides, hotels, flights) */
   image: string;
   status: 'pending' | 'done' | 'failed';
   parsed: ParsedReceipt | null;
   error: string;
+}
+
+/** Whether the receipt's stored file is a PDF (vs a photo). */
+export function receiptIsPdf(r: ReceiptRecord): boolean {
+  return r.image.toLowerCase().endsWith('.pdf');
 }
 
 /** All calls attach the group token as ?t= — that's the whole auth model. */
@@ -303,27 +309,34 @@ export class DivvyApi {
   }
 
   /**
-   * Upload a receipt image. The server-side OCR hook runs during this request,
-   * so the returned record is usually already done/failed — but poll to be safe.
+   * Upload a receipt file (photo or PDF) for parsing. The server-side OCR
+   * hook runs during this request, so the returned record is usually already
+   * done/failed — but poll to be safe.
    */
-  async uploadReceipt(groupId: string, image: Blob, t: string): Promise<ReceiptRecord> {
-    const form = new FormData();
-    form.set('group', groupId);
-    form.set('status', 'pending');
-    form.set('image', image, 'receipt.jpg');
-    return this.pb.collection('receipts').create(form, { query: { t } });
+  async uploadReceipt(groupId: string, file: Blob, t: string): Promise<ReceiptRecord> {
+    return this.createReceipt(groupId, file, 'pending', t);
   }
 
   /**
-   * Upload a receipt image as a plain attachment, skipping OCR: the server
+   * Upload a receipt file as a plain attachment, skipping OCR: the server
    * hook only parses records created with status 'pending', so starting at
-   * 'done' stores the photo and nothing else.
+   * 'done' stores the file and nothing else.
    */
-  async uploadReceiptImage(groupId: string, image: Blob, t: string): Promise<ReceiptRecord> {
+  async uploadReceiptImage(groupId: string, file: Blob, t: string): Promise<ReceiptRecord> {
+    return this.createReceipt(groupId, file, 'done', t);
+  }
+
+  private async createReceipt(
+    groupId: string,
+    file: Blob,
+    status: 'pending' | 'done',
+    t: string,
+  ): Promise<ReceiptRecord> {
     const form = new FormData();
     form.set('group', groupId);
-    form.set('status', 'done');
-    form.set('image', image, 'receipt.jpg');
+    form.set('status', status);
+    // The extension is what the OCR hook keys its media type off.
+    form.set('image', file, file.type === 'application/pdf' ? 'receipt.pdf' : 'receipt.jpg');
     return this.pb.collection('receipts').create(form, { query: { t } });
   }
 

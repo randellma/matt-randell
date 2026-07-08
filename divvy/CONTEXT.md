@@ -29,7 +29,7 @@ How an Expense's amount divides among Members. One of four modes: **Evenly** (pa
 _Avoid_: Breakdown, allocation, division
 
 **Receipt**:
-A photo of an itemized bill, parsed by OCR into line Items plus tax/tip/total. Exists so an Itemized Split can be assembled by tapping rather than typing.
+A photo or PDF of an itemized bill (PDFs cover emailed receipts — rides, hotels, flights, stays), parsed by OCR into line Items plus tax/tip/total. Exists so an Itemized Split can be assembled by tapping rather than typing.
 _Avoid_: Scan, upload
 
 **Item**:

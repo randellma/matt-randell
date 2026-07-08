@@ -1,9 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Receipt OCR: when a receipt record is created, send its image to the
-// Claude API (vision + JSON-schema structured output) and write the parsed
-// itemization back onto the record. The PWA polls the record until status
-// flips from "pending".
+// Receipt OCR: when a receipt record is created, send its file (photo or
+// PDF) to the Claude API (vision/PDF input + JSON-schema structured output)
+// and write the parsed itemization back onto the record. The PWA polls the
+// record until status flips from "pending".
 //
 // Env:
 //   ANTHROPIC_API_KEY  — required; parsing fails with a clear error without it

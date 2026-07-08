@@ -374,6 +374,12 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 }
 .receipt-thumb:active { transform: rotate(0deg) scale(1.03); }
 .receipt-thumb img { display: block; height: 56px; max-width: 84px; object-fit: cover; }
+/* PDF receipts have no thumbnail — a paper-doc chip stands in */
+.receipt-thumb.pdf {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 56px; height: 56px; box-sizing: content-box; color: var(--ink);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em; text-decoration: none;
+}
 .receipt-note { flex: 1; text-align: left; font-size: 0.72rem; color: var(--faint); letter-spacing: 0.05em; }
 .attach-btn { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; color: var(--faint); border-color: var(--line); }
 .attach-btn:active { color: var(--ink); }

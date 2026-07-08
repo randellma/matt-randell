@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../app';
+import { receiptIsPdf } from '../api';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, ReceiptRecord, SplitData } from '../api';
 import { allocate, allocateEven } from '../lib/money';
 import {
@@ -173,7 +174,18 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     return () => window.removeEventListener('keydown', onKey);
   }, [receiptOpen]);
 
+  // Photos get re-encoded well under the server's 15MB cap; PDFs upload as-is,
+  // so oversized ones are turned away with a real message instead of a 400.
+  function pdfTooBig(file: File): boolean {
+    if (file.type === 'application/pdf' && file.size > 15 * 1024 * 1024) {
+      setError('That PDF is over 15MB — too big to attach.');
+      return true;
+    }
+    return false;
+  }
+
   async function attachReceipt(file: File) {
+    if (pdfTooBig(file)) return;
     setAttachState('working');
     setError('');
     try {
@@ -337,6 +349,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const owesEntries = mode === 'percent' ? percentDisplayEntries : (preview.entries ?? null);
 
   async function scanReceipt(file: File) {
+    if (pdfTooBig(file)) return;
     setScanState('working');
     setError('');
     try {
@@ -544,9 +557,27 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <div class="receipt-row">
               {receiptRec ? (
                 <>
-                  <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
-                    <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
-                  </button>
+                  {receiptIsPdf(receiptRec) ? (
+                    // PocketBase can't thumbnail a PDF, so this is a paper-doc
+                    // chip; tapping opens the browser's own PDF viewer.
+                    <a
+                      class="receipt-thumb pdf"
+                      title="View receipt"
+                      href={api.receiptImageUrl(receiptRec)}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      PDF
+                    </a>
+                  ) : (
+                    <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
+                      <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
+                    </button>
+                  )}
                   <span class="receipt-note">Tap to view</span>
                 </>
               ) : (
@@ -561,10 +592,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
-              Attach photo
+              Attach photo or PDF
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 hidden
                 onChange={e => {
                   const file = (e.target as HTMLInputElement).files?.[0];
@@ -949,7 +980,7 @@ function ItemEditor({
           {items.length ? 'Rescan receipt' : 'Scan receipt'}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             hidden
             onChange={e => {
               const file = (e.target as HTMLInputElement).files?.[0];
