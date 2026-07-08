@@ -98,7 +98,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
           to_member: to,
           amount_cents: cents,
           date: `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`,
-          note: '',
+          note: partyNote(fromUnit, toUnit, unitName),
           currency: groupCurrency,
           fx_cents: 0,
         },
@@ -220,6 +220,9 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
           onClose={() => setRecording(false)}
           onSave={(from_member, to_member, amount_cents, note) => {
             setRecording(false);
+            const fromUnit = visibleUnits.find(u => u.memberIds.includes(from_member))!;
+            const toUnit = visibleUnits.find(u => u.memberIds.includes(to_member))!;
+            const auto = partyNote(fromUnit, toUnit, unitName);
             run(async () => {
               await api.createPayment(
                 {
@@ -228,7 +231,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
                   to_member,
                   amount_cents,
                   date: `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`,
-                  note,
+                  note: [auto, note].filter(Boolean).join(' · '),
                   currency: groupCurrency,
                   fx_cents: 0,
                 },
@@ -242,6 +245,20 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
       {error && <p class="error">{error}</p>}
     </div>
   );
+}
+
+/**
+ * A payment's from_member/to_member always names an individual representative,
+ * even when a whole party settled — so when either side is a linked party,
+ * note which wallet(s) were actually involved.
+ */
+function partyNote(fromUnit: UnitBalance, toUnit: UnitBalance, unitName: (u: UnitBalance) => string): string {
+  const fromIsParty = fromUnit.memberIds.length > 1;
+  const toIsParty = toUnit.memberIds.length > 1;
+  if (fromIsParty && toIsParty) return `${unitName(fromUnit)} wallet → ${unitName(toUnit)} wallet`;
+  if (fromIsParty) return `From the ${unitName(fromUnit)} wallet`;
+  if (toIsParty) return `Into the ${unitName(toUnit)} wallet`;
+  return '';
 }
 
 function BalanceAmount({ cents, fmt }: { cents: number; fmt: (cents: number) => string }) {
