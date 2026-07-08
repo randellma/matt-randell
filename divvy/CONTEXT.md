@@ -9,7 +9,7 @@ A shared ledger of Expenses and Payments among a set of Members, identified by i
 _Avoid_: Household, party, event
 
 **Member**:
-A name inside a Group. Not an account — just a label people attach expenses to. Anyone holding the link may add themselves as a Member or act as any existing Member.
+A name inside a Group. Not an account — just a label people attach expenses to. Anyone holding the link may add themselves as a Member or act as any existing Member. A Member may be removed once their Balance is zero: one who never appeared in an Expense or Payment is deleted outright, while one with history is kept but flagged `removed` — off every picker, unlinked from any Party, still named on the Expenses they were part of, and restorable.
 _Avoid_: User, account, participant (participant means something narrower — see Split)
 
 **Identity**:

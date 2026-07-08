@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { api, navigate } from '../app';
-import type { GroupRecord, MemberRecord, SecurityInfo } from '../api';
-import { convertMinor } from '../lib/currency';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, SecurityInfo } from '../api';
+import { convertMinor, formatMoney } from '../lib/currency';
 import { fetchRate } from '../lib/fx';
+import { computeNets, expenseForBalance, paymentGroupCents, suggestSettlements } from '../lib/balances';
+import { activeMembers, memberReferenced } from '../lib/member';
 import { prepareAvatarImage } from '../image';
 import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
 import { groupParties, partyDisplayName } from '../lib/party';
@@ -15,6 +17,8 @@ interface Props {
   group: GroupRecord;
   token: string;
   members: MemberRecord[];
+  expenses: ExpenseRecord[];
+  payments: PaymentRecord[];
   me: string;
   /** the user tapped a different member as "you" — local identity only */
   onMeChange: (memberId: string) => void;
@@ -32,7 +36,7 @@ interface Props {
  * every expense's and payment's stored conversion at its own date — amounts
  * stay in their original currencies; only the group-level view moves.
  */
-export function GroupSettings({ group, token, members, me, onMeChange, onTokenRotated, onDone }: Props) {
+export function GroupSettings({ group, token, members, expenses, payments, me, onMeChange, onTokenRotated, onDone }: Props) {
   // Local copies so photo/party edits show up without leaving the page; the
   // caller reloads on the way out whenever anything was mutated.
   const [grp, setGrp] = useState(group);
@@ -40,6 +44,15 @@ export function GroupSettings({ group, token, members, me, onMeChange, onTokenRo
   const mutated = useRef(false);
 
   const oldCurrency = group.currency || 'USD';
+  const groupCurrency = grp.currency || 'USD';
+
+  // Net position per member, so removal can be gated to settled members. Reads
+  // the expenses/payments as loaded — settling in Balances reloads the group,
+  // so this reflects the latest ledger whenever settings is opened.
+  const nets = computeNets(
+    expenses.map(e => expenseForBalance(e, groupCurrency)),
+    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
+  );
   const [name, setName] = useState(group.name);
   const [currency, setCurrency] = useState(oldCurrency);
   const [expenseCurrency, setExpenseCurrency] = useState(group.expense_currency || '');
@@ -68,6 +81,11 @@ export function GroupSettings({ group, token, members, me, onMeChange, onTokenRo
 
   function replaceMembers(updated: MemberRecord[]) {
     setMems(ms => ms.map(m => updated.find(u => u.id === m.id) ?? m));
+  }
+
+  /** Drop a hard-deleted member from the local list (no record left to reload). */
+  function dropMember(id: string) {
+    setMems(ms => ms.filter(m => m.id !== id));
   }
 
   const pickGroupPhoto = (file: File) =>
@@ -223,7 +241,7 @@ export function GroupSettings({ group, token, members, me, onMeChange, onTokenRo
       <div class="field">
         <span>You are</span>
         <div class="chip-row wrap">
-          {mems.map(m => (
+          {activeMembers(mems).map(m => (
             <button
               key={m.id}
               class={`chip with-avatar ${m.id === me ? 'on' : ''}`}
@@ -280,9 +298,14 @@ export function GroupSettings({ group, token, members, me, onMeChange, onTokenRo
         members={mems}
         groupId={grp.id}
         token={token}
+        me={me}
         busy={busy}
+        groupCurrency={groupCurrency}
+        netOf={id => nets.get(id) ?? 0}
+        referenced={id => memberReferenced(id, expenses, payments)}
         run={run}
         replaceMembers={replaceMembers}
+        dropMember={dropMember}
         appendMember={m => setMems(ms => [...ms, m])}
         pickPhoto={pickMemberPhoto}
         clearPhoto={clearMemberPhoto}
@@ -365,15 +388,23 @@ function PhotoInput({
 /**
  * The member roster: add people who aren't here to add themselves, rename
  * anyone (expenses point at member ids, so history follows the new name),
- * and manage member photos.
+ * manage member photos, and remove people who've left. Removing a settled
+ * member who's been in expenses keeps them on that history but drops them from
+ * every picker; someone never referenced is deleted outright. Removed members
+ * collect in a restore list below.
  */
 function MemberEditor({
   members,
   groupId,
   token,
+  me,
   busy,
+  groupCurrency,
+  netOf,
+  referenced,
   run,
   replaceMembers,
+  dropMember,
   appendMember,
   pickPhoto,
   clearPhoto,
@@ -381,15 +412,23 @@ function MemberEditor({
   members: MemberRecord[];
   groupId: string;
   token: string;
+  me: string;
   busy: boolean;
+  groupCurrency: string;
+  netOf: (id: string) => number;
+  referenced: (id: string) => boolean;
   run: (action: () => Promise<void>) => void;
   replaceMembers: (updated: MemberRecord[]) => void;
+  dropMember: (id: string) => void;
   appendMember: (m: MemberRecord) => void;
   pickPhoto: (m: MemberRecord, file: File) => void;
   clearPhoto: (m: MemberRecord) => void;
 }) {
   const [newName, setNewName] = useState('');
   const [renaming, setRenaming] = useState<MemberRecord | null>(null);
+
+  const active = members.filter(m => !m.removed);
+  const removed = members.filter(m => m.removed);
 
   function add() {
     const name = newName.trim();
@@ -404,11 +443,109 @@ function MemberEditor({
     run(async () => replaceMembers([await api.updateMember(m.id, { name }, token)]));
   }
 
+  /** Flag a member removed and unlink them; a lone remaining party-mate is
+   *  unlinked too, since a one-person party isn't one. */
+  function softRemove(m: MemberRecord) {
+    const updates = [
+      api.updateMember(m.id, { removed: true, party: '', party_name: '', party_photo: null }, token),
+    ];
+    const remaining = m.party ? members.filter(o => o.party === m.party && o.id !== m.id) : [];
+    if (remaining.length === 1) {
+      updates.push(api.updateMember(remaining[0]!.id, { party: '', party_name: '', party_photo: null }, token));
+    }
+    return updates;
+  }
+
+  function remove(m: MemberRecord) {
+    const net = netOf(m.id);
+    if (net !== 0) {
+      // A non-zero balance that's purely internal to a settled party (a couple
+      // where one owes the other, but the household nets to zero) can still be
+      // removed: record the settle-up between them, then take them off.
+      const partyMembers = m.party ? members.filter(o => o.party === m.party) : [];
+      const partyNet = partyMembers.reduce((s, o) => s + netOf(o.id), 0);
+      const owed = formatMoney(Math.abs(net), groupCurrency);
+      if (!(m.party && partyMembers.length >= 2 && partyNet === 0)) {
+        alert(
+          `${m.name} isn't settled up — ${net > 0 ? `the group owes them ${owed}` : `they owe ${owed}`}.\n\n` +
+            'Square their balance to zero on the Balances tab first, then remove them.',
+        );
+        return;
+      }
+      const partyName = partyDisplayName(partyMembers);
+      if (
+        !confirm(
+          `Within ${partyName}, ${m.name} ${net < 0 ? `owes ${owed}` : `is owed ${owed}`} — but the ` +
+            `household nets to zero.\n\n` +
+            `Remove ${m.name}? This records that ${owed} settle-up inside ${partyName} so it stays ` +
+            `square, then drops ${m.name} from everything going forward. You can restore them later.`,
+        )
+      ) {
+        return;
+      }
+      // Settle m against their party-mates: the transfers touching m zero them
+      // out (the party nets to zero, so m is always fully covered internally).
+      const partyNets = new Map(partyMembers.map(o => [o.id, netOf(o.id)]));
+      const transfers = suggestSettlements(partyNets).filter(t => t.from === m.id || t.to === m.id);
+      run(async () => {
+        const date = `${new Date().toISOString().slice(0, 10)} 12:00:00.000Z`;
+        for (const t of transfers) {
+          await api.createPayment(
+            {
+              group: groupId,
+              from_member: t.from,
+              to_member: t.to,
+              amount_cents: t.cents,
+              date,
+              note: `Settling up on removing from ${partyName}`,
+              currency: groupCurrency,
+              fx_cents: 0,
+            },
+            token,
+          );
+        }
+        replaceMembers(await Promise.all(softRemove(m)));
+      });
+      return;
+    }
+    if (referenced(m.id)) {
+      if (
+        !confirm(
+          `Remove ${m.name}?\n\n` +
+            "They'll stay on the past expenses they were part of, but drop off " +
+            'everything going forward — no new splits, no settle-up, no party. ' +
+            'You can restore them later from the Removed list.',
+        )
+      ) {
+        return;
+      }
+      // Unlink from any party at the same time — a removed member settles alone.
+      run(async () => replaceMembers(await Promise.all(softRemove(m))));
+    } else {
+      if (
+        !confirm(
+          `Delete ${m.name}?\n\n` +
+            "They've never been in an expense, so they'll be removed completely. This can't be undone.",
+        )
+      ) {
+        return;
+      }
+      run(async () => {
+        await api.deleteMember(m.id, token);
+        dropMember(m.id);
+      });
+    }
+  }
+
+  function restore(m: MemberRecord) {
+    run(async () => replaceMembers([await api.updateMember(m.id, { removed: false }, token)]));
+  }
+
   return (
     <div class="stack-sm">
       <div class="seclbl left">Members</div>
       <p class="hint sans left">Tap the avatar for a photo, the name to rename.</p>
-      {members.map(m => (
+      {active.map(m => (
         <div key={m.id} class="party-row">
           <PhotoInput busy={busy} onPick={f => pickPhoto(m, f)}>
             <Avatar
@@ -430,8 +567,37 @@ function MemberEditor({
               Add photo
             </PhotoInput>
           )}
+          {m.id === me ? (
+            <span class="hint sans" title="Switch who you are to remove yourself">
+              you
+            </span>
+          ) : (
+            <button class="btn small danger" disabled={busy} onClick={() => remove(m)}>
+              Remove
+            </button>
+          )}
         </div>
       ))}
+
+      {removed.length > 0 && (
+        <>
+          <div class="seclbl left muted">Removed · tap to restore</div>
+          {removed.map(m => (
+            <div key={m.id} class="party-row">
+              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={34} src={api.memberPhotoUrl(m)} />
+              <span class="party-name faint">{m.name}</span>
+              <button class="btn small" disabled={busy} onClick={() => restore(m)}>
+                Restore
+              </button>
+            </div>
+          ))}
+          <p class="hint sans left">
+            They still appear on the expenses they were part of; restoring brings
+            them back to every picker.
+          </p>
+        </>
+      )}
+
       <div class="inline-add">
         <input
           value={newName}
@@ -531,7 +697,7 @@ function PartyEditor({
   const [renaming, setRenaming] = useState<MemberRecord[] | null>(null);
 
   const parties = groupParties(members);
-  const solo = members.filter(m => !m.party);
+  const solo = members.filter(m => !m.party && !m.removed);
 
   function link() {
     if (selected.length < 2) return;

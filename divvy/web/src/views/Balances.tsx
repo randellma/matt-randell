@@ -49,6 +49,13 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
     payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
   );
   const units = aggregateUnits(nets, members);
+  // A removed member who's settled up drops off the ledger entirely; one left
+  // with a non-zero balance (e.g. an old expense was edited after removal)
+  // still shows, so money is never hidden.
+  const removedIds = new Set(members.filter(m => m.removed).map(m => m.id));
+  const visibleUnits = units.filter(
+    u => !(u.cents === 0 && u.memberIds.every(id => removedIds.has(id))),
+  );
   const unitByKey = new Map(units.map(u => [u.key, u]));
   const unitName = (u: UnitBalance) => {
     const custom = u.memberIds.map(id => memberById.get(id)?.party_name).find(Boolean);
@@ -60,7 +67,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
     if (u.memberIds.length > 1) return api.partyPhotoUrl(unitMembers);
     return unitMembers[0] ? api.memberPhotoUrl(unitMembers[0]) : undefined;
   };
-  const transfers = suggestSettlements(unitNets(units));
+  const transfers = suggestSettlements(unitNets(visibleUnits));
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -110,7 +117,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
       <div>
         <div class="seclbl left">The ledger</div>
         <ul class="balance-list">
-          {[...units]
+          {[...visibleUnits]
             .sort((a, b) => b.cents - a.cents)
             .map((u, i) => (
               <li key={u.key}>
@@ -206,7 +213,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
 
       {recording && (
         <PaymentSheet
-          units={units}
+          units={visibleUnits}
           unitName={unitName}
           nameOf={nameOf}
           currency={groupCurrency}

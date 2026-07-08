@@ -3,6 +3,7 @@ import { api, groupPath, navigate } from '../app';
 import { aggregateUnits, computeNets, expenseForBalance, paymentGroupCents } from '../lib/balances';
 import { detectCurrency, formatMoney } from '../lib/currency';
 import { collectiveInitials } from '../lib/avatar';
+import { activeMembers } from '../lib/member';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
@@ -42,7 +43,7 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
           setSummaries(s => ({
             ...s,
             [g.id]: {
-              memberCount: members.length,
+              memberCount: activeMembers(members).length,
               expenseCount: expenses.length,
               balanceCents: myUnit?.cents,
               currency,

@@ -9,8 +9,10 @@
 // whole group delete 400s. Marking those relations cascadeDelete too closes
 // the gap: whichever branch PocketBase visits first, deleting a member also
 // takes its expenses/payments with it, same as deleting the group directly
-// would. There's no standalone "remove member" feature yet, so this can't
-// yet fire outside of a full group deletion.
+// would. The standalone "remove member" feature (migration 1751600010) leans
+// on this too, but only ever hard-deletes a member nothing references — so this
+// cascade has nothing to take — and flags referenced members `removed` instead
+// of deleting them, precisely to avoid dragging their history along.
 
 migrate(
   (app) => {

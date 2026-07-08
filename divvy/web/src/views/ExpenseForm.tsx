@@ -40,6 +40,22 @@ const MODES: { id: SplitMode; label: string }[] = [
 
 export function ExpenseForm({ group, token, members, me, expense, onDone }: Props) {
   const groupCurrency = group.currency || 'USD';
+
+  // The roster to choose from: active members, plus anyone already on the
+  // expense being edited even if they've since been removed — a removed member
+  // stays editable on their own history but is offered nowhere new.
+  const formMembers = useMemo(() => {
+    const involved = new Set<string>();
+    if (expense) {
+      involved.add(expense.paid_by);
+      expense.payers?.forEach(p => involved.add(p.member));
+      expense.split.entries.forEach(e => involved.add(e.member));
+      Object.keys(expense.split.percents ?? {}).forEach(id => involved.add(id));
+      Object.keys(expense.split.shares ?? {}).forEach(id => involved.add(id));
+      expense.split.items?.forEach(it => it.assignees.forEach(id => involved.add(id)));
+    }
+    return members.filter(m => !m.removed || involved.has(m.id));
+  }, [members, expense]);
   // Existing expenses keep their own currency; new ones start at the group's
   // default expense currency (set for trips where spending ≠ settling).
   const initialCurrency = expense
@@ -73,20 +89,20 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [participants, setParticipants] = useState<string[]>(
     expense?.split.mode === 'even'
       ? expense.split.entries.map(e => e.member)
-      : members.map(m => m.id),
+      : formMembers.map(m => m.id),
   );
   const [percents, setPercents] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     if (expense?.split.percents) {
       for (const [k, v] of Object.entries(expense.split.percents)) init[k] = String(v);
     } else {
-      const even = allocate(100, members.map(() => 1));
-      members.forEach((m, i) => { init[m.id] = String(even[i]); });
+      const even = allocate(100, formMembers.map(() => 1));
+      formMembers.forEach((m, i) => { init[m.id] = String(even[i]); });
     }
     return init;
   });
   const [shares, setShares] = useState<Record<string, number>>(
-    expense?.split.shares ?? Object.fromEntries(members.map(m => [m.id, 1])),
+    expense?.split.shares ?? Object.fromEntries(formMembers.map(m => [m.id, 1])),
   );
   const [items, setItems] = useState<AssignedItem[]>(expense?.split.items ?? []);
   const [receiptId, setReceiptId] = useState(expense?.receipt ?? '');
@@ -230,7 +246,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   // clean up by hand) — small manual tweaks from there are still expected.
   function removeFromPercent(id: string) {
     if ((parseFloat(percents[id] ?? '') || 0) <= 0) return;
-    const remaining = members.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0);
+    const remaining = formMembers.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0);
     const shares = allocate(100, remaining.map(() => 1));
     const next: Record<string, string> = { ...percents, [id]: '0' };
     remaining.forEach((m, i) => { next[m.id] = String(shares[i]); });
@@ -241,7 +257,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   // across them plus whoever was already in.
   function addBackToPercent(id: string) {
     const activeIds = [
-      ...members.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0).map(m => m.id),
+      ...formMembers.filter(m => m.id !== id && (parseFloat(percents[m.id] ?? '') || 0) > 0).map(m => m.id),
       id,
     ];
     const shares = allocate(100, activeIds.map(() => 1));
@@ -252,9 +268,9 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
   // Undo any removals/manual tweaks — back to an even split across everyone.
   function resetPercents() {
-    const even = allocate(100, members.map(() => 1));
+    const even = allocate(100, formMembers.map(() => 1));
     const next: Record<string, string> = {};
-    members.forEach((m, i) => { next[m.id] = String(even[i]); });
+    formMembers.forEach((m, i) => { next[m.id] = String(even[i]); });
     setPercents(next);
   }
 
@@ -282,14 +298,14 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           return { entries: computeEven(amountCents, participants) };
         }
         case 'percent': {
-          const parts = members
+          const parts = formMembers
             .map(m => ({ member: m.id, percent: parseFloat(percents[m.id] ?? '') || 0 }))
             .filter(p => p.percent > 0);
           if (parts.length === 0) return { problem: 'Enter percentages' };
           return { entries: computePercent(amountCents, parts) };
         }
         case 'shares': {
-          const parts = members
+          const parts = formMembers
             .map(m => ({ member: m.id, shares: shares[m.id] ?? 0 }))
             .filter(p => p.shares > 0);
           if (parts.length === 0) return { problem: 'Give someone at least one share' };
@@ -303,7 +319,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     } catch (e) {
       return { problem: e instanceof Error ? e.message : String(e) };
     }
-  }, [amountCents, mode, participants, percents, shares, items, members]);
+  }, [amountCents, mode, participants, percents, shares, items, formMembers]);
 
   // Percent mode's "who owes what" stays visible even while the percentages
   // don't add to 100 — it just shows what each literal percentage works out
@@ -311,12 +327,12 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   // vanishing behind the "needs 100%" message like `preview` would.
   const percentDisplayEntries = useMemo<SplitEntry[] | null>(() => {
     if (mode !== 'percent' || amountCents === null || amountCents <= 0) return null;
-    const parts = members
+    const parts = formMembers
       .map(m => ({ member: m.id, percent: parseFloat(percents[m.id] ?? '') || 0 }))
       .filter(p => p.percent > 0);
     if (parts.length === 0) return null;
     return parts.map(p => ({ member: p.member, cents: Math.round((amountCents * p.percent) / 100) }));
-  }, [mode, amountCents, percents, members]);
+  }, [mode, amountCents, percents, formMembers]);
 
   const owesEntries = mode === 'percent' ? percentDisplayEntries : (preview.entries ?? null);
 
@@ -376,7 +392,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     const split: SplitData = { mode, entries: preview.entries };
     if (mode === 'percent') {
       split.percents = Object.fromEntries(
-        members
+        formMembers
           .map(m => [m.id, parseFloat(percents[m.id] ?? '') || 0] as const)
           .filter(([, v]) => v > 0),
       );
@@ -501,7 +517,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         )}
         <div class="field" style="margin-top:14px;">
           <span>Paid by</span>
-          <MemberChips members={members} selected={payerIds} onChange={togglePayers} />
+          <MemberChips members={formMembers} selected={payerIds} onChange={togglePayers} />
         </div>
         {payerIds.length > 1 && (
           <div class="split-rows" style="margin-top:11px;">
@@ -577,13 +593,13 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
         {mode === 'even' && (
           <div style="margin-top:13px;">
             <p class="hint sans" style="margin:0 0 11px;text-align:left;">Tap who was in on this one.</p>
-            <MemberChips members={members} selected={participants} onChange={setParticipants} />
+            <MemberChips members={formMembers} selected={participants} onChange={setParticipants} />
           </div>
         )}
 
         {mode === 'percent' && (() => {
-          const inSplit = members.filter(m => (parseFloat(percents[m.id] ?? '') || 0) > 0);
-          const removed = members.filter(m => (parseFloat(percents[m.id] ?? '') || 0) <= 0);
+          const inSplit = formMembers.filter(m => (parseFloat(percents[m.id] ?? '') || 0) > 0);
+          const removed = formMembers.filter(m => (parseFloat(percents[m.id] ?? '') || 0) <= 0);
           return (
             <div class="split-rows" style="margin-top:13px;">
               {inSplit.map(m => (
@@ -612,7 +628,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                   </button>
                 </div>
               ))}
-              <PercentSum percents={percents} members={members} />
+              <PercentSum percents={percents} members={formMembers} />
 
               {removed.length > 0 && (
                 <>
@@ -635,7 +651,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
         {mode === 'shares' && (
           <div class="split-rows" style="margin-top:13px;">
-            {members.map(m => (
+            {formMembers.map(m => (
               <div key={m.id} class="split-row">
                 <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={28} src={api.memberPhotoUrl(m)} />
                 <span class="split-name">{m.name}</span>
@@ -658,7 +674,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <ItemEditor
               items={items}
               setItems={setItems}
-              members={members}
+              members={formMembers}
               amountCents={amountCents}
               currency={currency}
               scanState={scanState}

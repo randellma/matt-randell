@@ -44,6 +44,8 @@ export interface MemberRecord {
   photo: string;
   /** party avatar photo filename, mirrored on every member of the party */
   party_photo: string;
+  /** kept only to resolve their name on old expenses; hidden from every picker */
+  removed: boolean;
 }
 
 /** Everything needed to render and re-edit a split, stored as JSON on the expense. */
@@ -201,10 +203,21 @@ export class DivvyApi {
     memberId: string,
     // party_photo is a file field: null deletes it (on unlink); uploading goes
     // through setPartyPhoto.
-    data: Partial<Pick<MemberRecord, 'name' | 'party' | 'party_name'>> & { party_photo?: null },
+    data: Partial<Pick<MemberRecord, 'name' | 'party' | 'party_name' | 'removed'>> & { party_photo?: null },
     t: string,
   ): Promise<MemberRecord> {
     return this.pb.collection('members').update(memberId, data, { query: { t } });
+  }
+
+  /**
+   * Hard-delete a member. Only safe for a member nothing references: the
+   * `paid_by`/`from_member`/`to_member` relations cascade-delete (migration
+   * 1751600009), so deleting a referenced member would take their expenses and
+   * payments with it. Referenced members are flagged `removed` via updateMember
+   * instead — see GroupSettings.removeMember.
+   */
+  async deleteMember(memberId: string, t: string): Promise<void> {
+    await this.pb.collection('members').delete(memberId, { query: { t } });
   }
 
   /** Set (or with null, remove) a group's avatar photo. */

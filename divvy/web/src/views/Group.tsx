@@ -13,6 +13,7 @@ import {
 } from '../lib/balances';
 import { formatMoney } from '../lib/currency';
 import { partyDisplayName } from '../lib/party';
+import { activeMembers } from '../lib/member';
 import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
 import { ExpenseForm } from './ExpenseForm';
@@ -160,6 +161,8 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         group={group}
         token={token}
         members={members}
+        expenses={expenses}
+        payments={payments}
         me={me!}
         onMeChange={memberId => {
           rememberGroup({ id: group.id, t: token, name: group.name, memberId });
@@ -506,7 +509,7 @@ function JoinScreen({
       </header>
       <section class="ticket-box">
         <div class="chip-row wrap">
-          {members.map(m => (
+          {activeMembers(members).map(m => (
             <button key={m.id} class="chip lg with-avatar" onClick={() => onJoined(m.id)}>
               <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} src={api.memberPhotoUrl(m)} />
               {m.name}
