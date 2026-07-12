@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, SecurityInfo } from '../api';
 import { getJoinedGroup, rememberGroup } from '../identity';
@@ -9,6 +9,8 @@ import {
   expenseForBalance,
   expenseGroupCents,
   paymentGroupCents,
+  suggestSettlements,
+  unitNets,
   type ExpenseForBalance,
 } from '../lib/balances';
 import { formatMoney } from '../lib/currency';
@@ -16,6 +18,7 @@ import { partyDisplayName } from '../lib/party';
 import { activeMembers } from '../lib/member';
 import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
+import { ShareQr } from '../components/ShareQr';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
 import { GroupSettings } from './GroupSettings';
@@ -200,13 +203,15 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
     );
   }
 
+  // Path form (not the hash route) so the server can serve a per-group
+  // link-preview card to messaging-app crawlers. PIN-gated groups share a
+  // token-less link — the PIN is the way in, not the URL.
+  const shareUrl = group.pin_on
+    ? `${location.origin}/g/${group.id}`
+    : `${location.origin}/g/${group.id}/${token}`;
+
   async function share() {
-    // Path form (not the hash route) so the server can serve a per-group
-    // link-preview card to messaging-app crawlers. PIN-gated groups share a
-    // token-less link — the PIN is the way in, not the URL.
-    const url = group!.pin_on
-      ? `${location.origin}/g/${group!.id}`
-      : `${location.origin}/g/${group!.id}/${token}`;
+    const url = shareUrl;
     const data = {
       title: `Slate: ${group!.name}`,
       text: group!.pin_on
@@ -225,6 +230,41 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
     setTimeout(() => setShared(false), 2000);
   }
 
+  // Your position, for the slate board and the expenses-tab totals. "You"
+  // means your wallet: yourself, or your whole party if you're linked.
+  const groupCurrency = group.currency || 'USD';
+  const nets = computeNets(
+    expenses.map(e => expenseForBalance(e, groupCurrency)),
+    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
+  );
+  const units = aggregateUnits(nets, members);
+  const totalSpent = expenses.reduce((a, e) => a + expenseGroupCents(e, groupCurrency), 0);
+  const unsettled = units.reduce((a, u) => a + Math.max(0, u.cents), 0);
+  const myUnit = units.find(u => u.memberIds.includes(me!));
+  const mine = myUnit?.cents ?? 0;
+  const transfers = suggestSettlements(unitNets(units));
+  const myTransfers = myUnit
+    ? transfers.filter(t => (mine < 0 ? t.from === myUnit.key : t.to === myUnit.key)).length
+    : 0;
+  // If you're in a party, the wallet is shared — label the board with its name.
+  const walletName =
+    myUnit && myUnit.memberIds.length > 1
+      ? partyDisplayName(members.filter(m => myUnit.memberIds.includes(m.id)))
+      : '';
+
+  function settleUp() {
+    const scroll = () =>
+      document.getElementById('settle-up')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (tab !== 'balances') {
+      setTab('balances');
+      setTimeout(scroll, 80);
+    } else {
+      scroll();
+    }
+  }
+
+  const fmt = (cents: number) => formatMoney(cents, groupCurrency);
+
   return (
     <div class="page">
       <header class="group-header">
@@ -232,40 +272,55 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         <Avatar
           initials={collectiveInitials(group.name)}
           color="#0B7A4E"
-          size={60}
+          size={52}
+          radius={12}
           src={api.groupPhotoUrl(group)}
         />
         <div class="group-header-text">
           <h1>{group.name}</h1>
           <div class="group-header-bottom">
+            <span class="me-chip">
+              <span class="me-dot">{personInitial(memberById.get(me!)?.name ?? '?')}</span>
+              You · {memberById.get(me!)?.name}
+            </span>
+            <span class="spacer" />
             <button
-              class="me-chip"
+              class="icon-btn"
               title="Group settings"
+              aria-label="Group settings"
               onClick={() => navigate(groupPath(groupId, linkToken, '/settings'))}
             >
-              You: {memberById.get(me!)?.name} ·{' '}
-              <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              {' '}Settings
             </button>
-            <button class="icon-btn" title={shared ? 'Copied!' : 'Invite'} onClick={share}>
+            <button class="icon-btn" title={shared ? 'Copied!' : 'Share group'} aria-label="Share group" onClick={share}>
               {shared ? (
-                <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
               ) : (
-                <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 3v12" />
-                  <path d="M7 8l5-5 5 5" />
-                  <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 15V4" />
+                  <path d="M8 7l4-4 4 4" />
+                  <path d="M5 13v7h14v-7" />
                 </svg>
               )}
             </button>
           </div>
         </div>
       </header>
+
+      <SlateBoard
+        mine={mine}
+        walletName={walletName}
+        paymentsLeft={myTransfers}
+        hasPayments={payments.length > 0}
+        hasExpenses={expenses.length > 0}
+        fmt={fmt}
+        onSettleUp={settleUp}
+      />
 
       <nav class="tabs">
         <button class={tab === 'expenses' ? 'on' : ''} onClick={() => setTab('expenses')}>
@@ -278,11 +333,15 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
 
       {tab === 'expenses' ? (
         <>
-          <WalletSummary group={group} expenses={expenses} payments={payments} members={members} me={me!} />
+          <div class="wallet-stats">
+            <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{fmt(totalSpent)}</span></div>
+            <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{fmt(unsettled)}</span></div>
+          </div>
+          <hr class="rule" />
           <div class="seclbl left">Recent expenses</div>
           <ExpenseList
             expenses={expenses}
-            groupCurrency={group.currency || 'USD'}
+            groupCurrency={groupCurrency}
             memberById={memberById}
             memberCount={members.length}
             groupId={groupId}
@@ -302,6 +361,10 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         />
       )}
 
+      <hr class="rule" style="margin-top:4px;" />
+      <ShareQr groupId={group.id} url={shareUrl} pinOn={group.pin_on} />
+      <div class="thanks">*** Thank you ***</div>
+
       <button class="fab" onClick={() => navigate(groupPath(groupId, linkToken, '/new'))} aria-label="Add expense">
         <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
@@ -312,52 +375,82 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
 }
 
 /**
- * The group's wallet: total spent, how much is still unsettled across the
- * group (sum of what creditors are owed), and where you personally stand.
+ * The slate board — a charcoal card above the tabs, on-screen everywhere,
+ * showing where your wallet stands. Settling the last debt wipes it clean
+ * with a chalk-eraser sweep.
  */
-function WalletSummary({
-  group,
-  expenses,
-  payments,
-  members,
-  me,
+function SlateBoard({
+  mine,
+  walletName,
+  paymentsLeft,
+  hasPayments,
+  hasExpenses,
+  fmt,
+  onSettleUp,
 }: {
-  group: GroupRecord;
-  expenses: ExpenseRecord[];
-  payments: PaymentRecord[];
-  members: MemberRecord[];
-  me: string;
+  mine: number;
+  walletName: string;
+  paymentsLeft: number;
+  hasPayments: boolean;
+  hasExpenses: boolean;
+  fmt: (cents: number) => string;
+  onSettleUp: () => void;
 }) {
-  const groupCurrency = group.currency || 'USD';
-  const fmt = (cents: number) => formatMoney(cents, groupCurrency);
-  const totalSpent = expenses.reduce((a, e) => a + expenseGroupCents(e, groupCurrency), 0);
-  const nets = computeNets(
-    expenses.map(e => expenseForBalance(e, groupCurrency)),
-    payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
-  );
-  const units = aggregateUnits(nets, members);
-  const unsettled = units.reduce((a, u) => a + Math.max(0, u.cents), 0);
-  const myUnit = units.find(u => u.memberIds.includes(me));
-  const mine = myUnit?.cents ?? 0;
-  // If you're in a party, the wallet is shared — label it by the party's name.
-  const partySuffix =
-    myUnit && myUnit.memberIds.length > 1
-      ? ` · ${partyDisplayName(members.filter(m => myUnit.memberIds.includes(m.id)))}`
-      : '';
+  // Play the wipe only when the balance just went to zero — not when a group
+  // that's already square first loads.
+  const prev = useRef<number | null>(null);
+  const justWiped = prev.current !== null && prev.current !== 0 && mine === 0;
+  useEffect(() => {
+    prev.current = mine;
+  }, [mine]);
+
+  const clean = mine === 0;
+  const wipeNote =
+    paymentsLeft === 1 ? '1 payment wipes it clean' : `${paymentsLeft} payments wipe it clean`;
+
   return (
-    <>
-      <div class="wallet-summary">
-        <div class="subline">Your running balance{partySuffix}</div>
-        <span class={`stamp big ${mine < 0 ? 'red' : ''}`}>
-          {mine === 0 ? "You're settled up" : mine > 0 ? `You're owed ${fmt(mine)}` : `You owe ${fmt(-mine)}`}
-        </span>
-        <div class="wallet-stats">
-          <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{fmt(totalSpent)}</span></div>
-          <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{fmt(unsettled)}</span></div>
+    <div class="slate-board">
+      {clean ? (
+        <div class={`slate-inner ${justWiped ? 'chalkin' : ''}`}>
+          <div class="slate-label">
+            <span>You're square</span>
+            {walletName && <span class="wallet">· {walletName}</span>}
+          </div>
+          <div class="slate-amount">{fmt(0)}</div>
+          <div class="slate-note">
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12l5 5 11-11" />
+            </svg>
+            <span>
+              {hasPayments
+                ? 'Slate wiped clean · tap a payment to undo'
+                : hasExpenses
+                  ? 'Nothing owed either way'
+                  : 'Nothing on the slate yet — tap + to start'}
+            </span>
+          </div>
         </div>
-      </div>
-      <hr class="rule" />
-    </>
+      ) : (
+        <div class="slate-inner">
+          <div class="slate-label">
+            <span>{mine < 0 ? 'You owe' : "You're owed"}</span>
+            {walletName && <span class="wallet">· {walletName}</span>}
+          </div>
+          <div class="slate-amount">{fmt(Math.abs(mine))}</div>
+          <div class="slate-actions">
+            <button class="slate-settle" onClick={onSettleUp}>Settle up</button>
+            <div class="slate-note">
+              <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="9" width="15" height="8" rx="2" transform="rotate(-20 11.5 13)" />
+                <path d="M6 20h13" />
+              </svg>
+              <span style="max-width:118px;">{wipeNote}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {justWiped && <div class="slate-wipe" />}
+    </div>
   );
 }
 

@@ -11,7 +11,7 @@ import {
   unitNets,
   type UnitBalance,
 } from '../lib/balances';
-import { colorForBalance, collectiveInitials } from '../lib/avatar';
+import { colorForBalance, colorForId, collectiveInitials } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
 
 interface Props {
@@ -24,7 +24,7 @@ interface Props {
   onChanged: () => void;
 }
 
-export function Balances({ group, token, members, expenses, payments, onChanged }: Props) {
+export function Balances({ group, token, members, me, expenses, payments, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
@@ -112,75 +112,98 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
     run(() => api.deletePayment(p.id, token));
   }
 
+  // The wallet a transfer row describes from your point of view.
+  const meUnit = units.find(u => u.memberIds.includes(me));
+  const transferLabel = (from: UnitBalance, to: UnitBalance) => {
+    const pays = from.memberIds.length > 1 ? 'pay' : 'pays';
+    if (meUnit?.key === from.key) return `You pay ${unitName(to)}`;
+    if (meUnit?.key === to.key) return `${unitName(from)} ${pays} you`;
+    return `${unitName(from)} ${pays} ${unitName(to)}`;
+  };
+
   return (
     <div class="stack">
       <div>
-        <div class="seclbl left">The ledger</div>
+        <div class="seclbl left">Balances by wallet</div>
         <ul class="balance-list">
           {[...visibleUnits]
             .sort((a, b) => b.cents - a.cents)
-            .map((u, i) => (
-              <li key={u.key}>
-                {i > 0 && <hr class="rule" style="margin-bottom:16px;" />}
-                <div class="balance-unit">
-                  <div
-                    class={`balance-line ${u.memberIds.length > 1 ? 'expandable' : ''}`}
-                    onClick={u.memberIds.length > 1 ? () => toggleExpanded(u.key) : undefined}
-                  >
-                    <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} src={unitPhoto(u)} />
-                    <span class="name">{unitName(u)}</span>
-                    {u.memberIds.length > 1 && (
-                      <span class={`caret ${expanded.has(u.key) ? 'open' : ''}`}>▾</span>
+            .map((u, i) => {
+              const plural = u.memberIds.length > 1;
+              const verb = u.cents === 0 ? 'settled' : u.cents > 0 ? (plural ? 'get' : 'gets') : plural ? 'owe' : 'owes';
+              return (
+                <li key={u.key}>
+                  {i > 0 && <hr class="rule" style="margin-bottom:16px;" />}
+                  <div class="balance-unit">
+                    <div
+                      class={`balance-line ${plural ? 'expandable' : ''}`}
+                      onClick={plural ? () => toggleExpanded(u.key) : undefined}
+                    >
+                      <Avatar initials={collectiveInitials(unitName(u))} color={colorForBalance(u.cents)} size={32} src={unitPhoto(u)} />
+                      <span class="balance-name">
+                        <span class="name">{unitName(u)}</span>
+                        {plural && <span class={`caret ${expanded.has(u.key) ? 'open' : ''}`}>▾</span>}
+                      </span>
+                      <span class={`balance-amt ${u.cents === 0 ? 'zero' : u.cents > 0 ? 'pos' : 'neg'}`}>
+                        <span class="verb">{verb}</span>
+                        <b class="num">{fmt(Math.abs(u.cents))}</b>
+                      </span>
+                    </div>
+                    {plural && expanded.has(u.key) && (
+                      <ul class="party-breakdown">
+                        {u.memberCents.map(mc => (
+                          <li key={mc.member} class="li">
+                            <span class="nm">{nameOf(mc.member)}</span>
+                            <span class="lead" />
+                            <span class="amt" style={{ color: mc.cents < 0 ? 'var(--red)' : 'var(--green)' }}>
+                              {mc.cents < 0 ? '−' : '+'}{fmt(Math.abs(mc.cents))}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                    <BalanceAmount cents={u.cents} fmt={fmt} />
                   </div>
-                  {u.memberIds.length > 1 && expanded.has(u.key) && (
-                    <ul class="party-breakdown">
-                      {u.memberCents.map(mc => (
-                        <li key={mc.member} class="li">
-                          <span class="nm faint">{nameOf(mc.member)}</span>
-                          <span class="lead" />
-                          <span class="amt" style={{ color: mc.cents < 0 ? 'var(--red)' : 'var(--accent)' }}>
-                            {mc.cents < 0 ? '−' : '+'}{fmt(Math.abs(mc.cents))}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
         </ul>
       </div>
-      <hr class="rule solid" />
 
       {transfers.length > 0 && (
-        <>
-          <div>
-            <div class="seclbl left">Settle up</div>
-            <ul class="settle-list">
-              {transfers.map(t => {
-                const from = unitByKey.get(t.from)!;
-                const to = unitByKey.get(t.to)!;
-                return (
-                  <li key={`${t.from}-${t.to}`} class="settle-row">
-                    <span class="settle-people">
-                      <Avatar initials={collectiveInitials(unitName(from))} color="#B84A38" size={26} src={unitPhoto(from)} />
-                      <span class="settle-arrow">→</span>
-                      <Avatar initials={collectiveInitials(unitName(to))} color="#0B7A4E" size={26} src={unitPhoto(to)} />
-                      <span>{unitName(from)} pays {unitName(to)} {fmt(t.cents)}</span>
+        <div>
+          <div class="seclbl left" id="settle-up" style="scroll-margin-top:14px;">Settle up</div>
+          <ul class="settle-list" style="margin-top:13px;">
+            {transfers.map(t => {
+              const from = unitByKey.get(t.from)!;
+              const to = unitByKey.get(t.to)!;
+              // Show the counterparty when you're on the row; both wallets otherwise.
+              const other = meUnit?.key === from.key ? to : from;
+              return (
+                <li key={`${t.from}-${t.to}`} class="settle-row">
+                  <span class="settle-main">
+                    {meUnit && (meUnit.key === from.key || meUnit.key === to.key) ? (
+                      <Avatar initials={collectiveInitials(unitName(other))} color={colorForId(other.key)} size={30} src={unitPhoto(other)} />
+                    ) : (
+                      <span class="avatar-stack">
+                        <Avatar initials={collectiveInitials(unitName(from))} color={colorForId(from.key)} size={30} src={unitPhoto(from)} />
+                        <Avatar initials={collectiveInitials(unitName(to))} color={colorForId(to.key)} size={30} src={unitPhoto(to)} />
+                      </span>
+                    )}
+                    <span class="settle-text">
+                      <span class="settle-label">{transferLabel(from, to)}</span>
+                      <b class="settle-amt num">{fmt(t.cents)}</b>
                     </span>
-                    <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
-                      Mark paid
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <hr class="rule" />
-        </>
+                  </span>
+                  <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
+                    Mark paid
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
+      <hr class="rule solid" />
 
       <div>
         <div class="seclbl left">Payments</div>
@@ -190,7 +213,7 @@ export function Balances({ group, token, members, expenses, payments, onChanged 
               <li key={p.id}>
                 <span>
                   {p.date.slice(0, 10)} · {nameOf(p.from_member)} → {nameOf(p.to_member)}{' '}
-                  <b>{formatMoney(p.amount_cents, p.currency || groupCurrency)}</b>
+                  <b class="num">{formatMoney(p.amount_cents, p.currency || groupCurrency)}</b>
                   {p.note && <span class="payment-note"> · {p.note}</span>}
                 </span>
                 <button class="item-remove" disabled={busy} onClick={() => deletePayment(p)}>
@@ -259,15 +282,6 @@ function partyNote(fromUnit: UnitBalance, toUnit: UnitBalance, unitName: (u: Uni
   if (fromIsParty) return `From the ${unitName(fromUnit)} wallet`;
   if (toIsParty) return `Into the ${unitName(toUnit)} wallet`;
   return '';
-}
-
-function BalanceAmount({ cents, fmt }: { cents: number; fmt: (cents: number) => string }) {
-  if (cents === 0) return <span class="stamp">Settled</span>;
-  return (
-    <span class={`stamp ${cents < 0 ? 'red' : ''}`}>
-      {cents > 0 ? `Gets ${fmt(cents)}` : `Owes ${fmt(-cents)}`}
-    </span>
-  );
 }
 
 /**

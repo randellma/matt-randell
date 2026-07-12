@@ -20,7 +20,7 @@ export function colorForId(id: string): string {
 
 /** Balance-status color: green if owed, red if owing, muted if settled. */
 export function colorForBalance(cents: number): string {
-  return cents > 0 ? '#0B7A4E' : cents < 0 ? '#B84A38' : '#9A9683';
+  return cents > 0 ? '#0F6B44' : cents < 0 ? '#A63D2A' : '#6B6654';
 }
 
 /** One person: first letter of their name, uppercased. */

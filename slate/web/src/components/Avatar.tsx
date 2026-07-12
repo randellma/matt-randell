@@ -4,10 +4,12 @@ interface Props {
   size?: number;
   /** photo URL — shown instead of the initials when set */
   src?: string;
+  /** corner radius override — defaults to a fifth of the size */
+  radius?: number;
 }
 
 /** Squared "luggage-tag" avatar — person, party, or group. Photo when one is set, initials otherwise. */
-export function Avatar({ initials, color, size = 30, src }: Props) {
+export function Avatar({ initials, color, size = 30, src, radius }: Props) {
   return (
     <span
       class="avatar"
@@ -15,7 +17,7 @@ export function Avatar({ initials, color, size = 30, src }: Props) {
         width: size,
         height: size,
         background: color,
-        borderRadius: Math.max(4, Math.round(size * 0.14)),
+        borderRadius: radius ?? Math.max(4, Math.round(size * 0.2)),
         fontSize: Math.round(size * 0.38),
       }}
     >
