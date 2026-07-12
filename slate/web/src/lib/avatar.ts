@@ -11,6 +11,13 @@ const PALETTE = [
   '#D97B4F', // orange
 ];
 
+/**
+ * Fallback fill for a group's own square avatar (before a photo is set).
+ * Slate charcoal — ties the tag to the board motif and keeps green reserved
+ * for the add-expense / settle-up actions.
+ */
+export const GROUP_AVATAR_COLOR = '#26292B';
+
 /** Stable color for a member, hashed from their id so it survives reordering. */
 export function colorForId(id: string): string {
   let hash = 0;

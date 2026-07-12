@@ -16,7 +16,7 @@ import {
 import { formatMoney } from '../lib/currency';
 import { partyDisplayName } from '../lib/party';
 import { activeMembers } from '../lib/member';
-import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
+import { colorForId, collectiveInitials, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
 import { ShareQr } from '../components/ShareQr';
 import { ExpenseForm } from './ExpenseForm';
@@ -271,7 +271,7 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         <button class="back" onClick={() => navigate('/')}>‹</button>
         <Avatar
           initials={collectiveInitials(group.name)}
-          color="#0B7A4E"
+          color={GROUP_AVATAR_COLOR}
           size={52}
           radius={12}
           src={api.groupPhotoUrl(group)}
@@ -593,7 +593,7 @@ function JoinScreen({
       <header class="app-header">
         {group.photo && (
           <div style="display:flex;justify-content:center;margin-bottom:10px;">
-            <Avatar initials={collectiveInitials(group.name)} color="#0B7A4E" size={64} src={api.groupPhotoUrl(group)} />
+            <Avatar initials={collectiveInitials(group.name)} color={GROUP_AVATAR_COLOR} size={64} src={api.groupPhotoUrl(group)} />
           </div>
         )}
         <h1>{group.name}</h1>

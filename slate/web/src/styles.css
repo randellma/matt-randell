@@ -93,7 +93,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 
 /* centered receipt header — the wordmark and its trimmings stay mono */
 .rhead { text-align: center; padding-top: 8px; font-family: 'Space Mono', ui-monospace, monospace; }
-.wordmark { font-weight: 700; font-size: 2.1rem; letter-spacing: 0.14em; color: var(--accent); }
+.wordmark { font-weight: 700; font-size: 2.1rem; letter-spacing: 0.14em; color: var(--ink); }
 .stars { color: var(--faint); font-size: 0.75rem; letter-spacing: 0.35em; margin-top: 2px; }
 .subline { font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.69rem; letter-spacing: 0.14em; color: var(--faint); text-transform: uppercase; margin-top: 7px; }
 

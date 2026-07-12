@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { api } from '../app';
 import type { SecurityInfo } from '../api';
-import { collectiveInitials } from '../lib/avatar';
+import { collectiveInitials, GROUP_AVATAR_COLOR } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
 
 /**
@@ -72,7 +72,7 @@ export function PinGate({
           <div style="display:flex;justify-content:center;margin-bottom:10px;">
             <Avatar
               initials={collectiveInitials(info.name ?? '')}
-              color="#0B7A4E"
+              color={GROUP_AVATAR_COLOR}
               size={64}
               src={api.groupPhotoUrlById(groupId, info.photo)}
             />

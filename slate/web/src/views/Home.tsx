@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
 import { aggregateUnits, computeNets, expenseForBalance, paymentGroupCents } from '../lib/balances';
 import { detectCurrency, formatMoney } from '../lib/currency';
-import { collectiveInitials } from '../lib/avatar';
+import { collectiveInitials, GROUP_AVATAR_COLOR } from '../lib/avatar';
 import { activeMembers } from '../lib/member';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
@@ -89,7 +89,7 @@ export function Home() {
                 <li key={g.id}>
                   {i > 0 && <hr class="rule" />}
                   <button class="row-btn group-row" onClick={() => navigate(groupPath(g.id, g.t))}>
-                    <Avatar initials={collectiveInitials(g.name)} color="#0B7A4E" size={42} src={s?.photoUrl} />
+                    <Avatar initials={collectiveInitials(g.name)} color={GROUP_AVATAR_COLOR} size={42} src={s?.photoUrl} />
                     <span class="group-row-main">
                       <span class="group-name">{g.name}</span>
                       <span class="group-meta">
