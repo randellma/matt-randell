@@ -137,9 +137,7 @@ export function Home() {
       )}
 
       <hr class="rule" style="margin-top:6px;" />
-      <div class="barcode" />
-      <div class="barnum">SLATE · SPLIT EXPENSES</div>
-      <div class="rhead subline" style="margin-top:2px;">*** Thank you ***</div>
+      <div class="thanks">*** Thank you ***</div>
     </div>
   );
 }

@@ -596,15 +596,6 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
   font-size: 0.69rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 2px;
 }
 
-/* barcode footer */
-.barcode {
-  height: 44px;
-  background-image: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 3px,
-    var(--ink) 3px 4px, transparent 4px 7px, var(--ink) 7px 10px, transparent 10px 11px);
-  background-size: 13px 100%; opacity: 0.9;
-}
-.barnum { font-family: 'Space Mono', ui-monospace, monospace; text-align: center; font-size: 0.68rem; letter-spacing: 0.3em; color: var(--faint); margin-top: 6px; }
-
 /* spinner */
 .spinner { width: 1.1rem; height: 1.1rem; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .big-spinner { width: 2.5rem; height: 2.5rem; border-width: 3px; }

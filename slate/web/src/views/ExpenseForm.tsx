@@ -752,8 +752,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
           : `${expense ? 'Save changes' : 'Add expense'}${amountCents !== null && amountCents > 0 ? ` · ${formatMoney(amountCents, currency)}` : ''}`}
       </button>
       <hr class="rule" style="margin-top:8px;" />
-      <div class="barcode" />
-      <div class="barnum">SLATE · {date.slice(5, 7)}/{date.slice(8, 10)}/{date.slice(0, 4)}</div>
+      <div class="thanks">*** Thank you ***</div>
 
       {receiptOpen && receiptRec && (
         <div class="lightbox" onClick={() => setReceiptOpen(false)}>

@@ -348,8 +348,7 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
       {progress && <p class="hint">{progress}</p>}
       {error && <p class="error">{error}</p>}
 
-      <div class="barcode" />
-      <div class="barnum">SLATE · SETTINGS</div>
+      <div class="thanks">*** Thank you ***</div>
     </div>
   );
 }
