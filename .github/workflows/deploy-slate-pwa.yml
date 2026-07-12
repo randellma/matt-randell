@@ -1,10 +1,10 @@
-name: Deploy Divvy PWA
+name: Deploy Slate PWA
 
 on:
   push:
     branches: [main]
     paths:
-      - divvy/web/**
+      - slate/web/**
   workflow_dispatch:
 
 jobs:
@@ -19,22 +19,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: divvy/web/package-lock.json
+          cache-dependency-path: slate/web/package-lock.json
       - name: Install dependencies
         run: npm ci
-        working-directory: divvy/web
+        working-directory: slate/web
       - name: Test
         run: npm test
-        working-directory: divvy/web
+        working-directory: slate/web
       - name: Typecheck
         run: npm run typecheck
-        working-directory: divvy/web
+        working-directory: slate/web
       - name: Build
         run: npm run build
-        working-directory: divvy/web
+        working-directory: slate/web
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name divvy-mattrandell --branch main
-        working-directory: divvy/web
+        run: npx wrangler pages deploy dist --project-name slate-mattrandell --branch main
+        working-directory: slate/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 894ff489298bdf1ca445fc9469854b25

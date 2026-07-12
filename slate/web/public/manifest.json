@@ -1,6 +1,6 @@
 {
-  "name": "Divvy",
-  "short_name": "Divvy",
+  "name": "Slate",
+  "short_name": "Slate",
   "description": "Split expenses with friends and family",
   "start_url": "/",
   "display": "standalone",

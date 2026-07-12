@@ -349,7 +349,7 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
       {error && <p class="error">{error}</p>}
 
       <div class="barcode" />
-      <div class="barnum">DIVVY · SETTINGS</div>
+      <div class="barnum">SLATE · SETTINGS</div>
     </div>
   );
 }

@@ -34,8 +34,8 @@ function recoveryEmailHtml(groupName, link) {
   const esc = (s) =>
     s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   return (
-    `<p>Someone on the join screen of the Divvy group <b>${esc(groupName)}</b> asked for a recovery link (usually a forgotten PIN, or joining got locked by too many wrong tries).</p>` +
-    `<p><a href="${esc(link)}">Open “${esc(groupName)}” on Divvy</a></p>` +
+    `<p>Someone on the join screen of the Slate group <b>${esc(groupName)}</b> asked for a recovery link (usually a forgotten PIN, or joining got locked by too many wrong tries).</p>` +
+    `<p><a href="${esc(link)}">Open “${esc(groupName)}” on Slate</a></p>` +
     `<p>Anyone with this link has full access to the group, so only forward it to people who belong there. Once in, you can change the PIN or unlock joining under Group settings.</p>` +
     `<p>If this wasn't you or your group, you can ignore this email.</p>`
   );

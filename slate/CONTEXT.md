@@ -1,4 +1,4 @@
-# Divvy
+# Slate
 
 Splitting shared expenses among friends and family with as little friction as possible. No accounts, no roles, no sign-up: a Group is a link, and holding the link is membership. The design bias is always toward fewer taps when logging an expense — trust is assumed (these are people who share dinners), accuracy is not (pennies must add up).
 
@@ -53,7 +53,7 @@ A Member's net position in a Group: what they've paid minus what they owe, acros
 _Avoid_: Debt, credit, tab
 
 **Payment**:
-A recorded transfer between two Members, outside the app (cash, Venmo, whatever) — either a settlement suggestion marked paid, or any arbitrary amount recorded by hand. Recording it is bookkeeping; Divvy never moves money. Always recorded in the Group currency.
+A recorded transfer between two Members, outside the app (cash, Venmo, whatever) — either a settlement suggestion marked paid, or any arbitrary amount recorded by hand. Recording it is bookkeeping; Slate never moves money. Always recorded in the Group currency.
 _Avoid_: Settlement (the *suggestion* is a settlement; the recorded fact is a Payment), transfer
 
 **Group currency**:

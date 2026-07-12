@@ -10,10 +10,11 @@
 //
 // Env:
 //   RESEND_API_KEY   — required for recovery emails (https://resend.com)
-//   DIVVY_EMAIL_FROM — sender, default "Divvy <divvy@mattrandell.com>";
-//                      the domain must be verified in Resend
+//   DIVVY_EMAIL_FROM — sender, default "Slate <slate@mattrandell.com>";
+//                      the domain must be verified in Resend. (Env var keeps
+//                      the DIVVY_ prefix from the old brand — see README.)
 //   DIVVY_APP_URL    — PWA origin used in emailed links,
-//                      default "https://divvy.mattrandell.com"
+//                      default "https://slate.mattrandell.com"
 //   DIVVY_RESEND_API_BASE — default "https://api.resend.com" (overridable
 //                      for tests, same pattern as DIVVY_OCR_API_BASE)
 
@@ -182,7 +183,7 @@ routerAdd('POST', '/api/divvy/groups/{id}/recover', (e) => {
     return e.json(503, { code: 'email_unconfigured', message: 'Recovery email is not configured on this server (RESEND_API_KEY).' });
   }
 
-  const appUrl = ($os.getenv('DIVVY_APP_URL') || 'https://divvy.mattrandell.com').replace(/\/$/, '');
+  const appUrl = ($os.getenv('DIVVY_APP_URL') || 'https://slate.mattrandell.com').replace(/\/$/, '');
   const name = group.getString('name');
   // Hash form so the token stays out of server/CDN request logs, same
   // reasoning as ADR-0001.
@@ -198,14 +199,14 @@ routerAdd('POST', '/api/divvy/groups/{id}/recover', (e) => {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Divvy <divvy@mattrandell.com>',
+      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Slate <slate@mattrandell.com>',
       to: [email],
-      subject: `Your access link for “${name}” on Divvy`,
+      subject: `Your access link for “${name}” on Slate`,
       html: utils.recoveryEmailHtml(name, link),
     }),
   });
   if (res.statusCode >= 300) {
-    console.error('divvy recovery email failed:', res.statusCode, res.raw);
+    console.error('slate recovery email failed:', res.statusCode, res.raw);
     return e.json(502, { code: 'send_failed', message: 'The recovery email could not be sent — try again later.' });
   }
 

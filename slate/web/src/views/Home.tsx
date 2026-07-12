@@ -72,7 +72,7 @@ export function Home() {
   return (
     <div class="page">
       <div class="rhead">
-        <div class="wordmark">DIVVY</div>
+        <div class="wordmark">SLATE</div>
         <div class="stars">* * * * *</div>
         <div class="subline">Split expenses without the fuss</div>
         <div class="subline" style="margin-top:3px;">No accounts · No sign-ups</div>
@@ -138,7 +138,7 @@ export function Home() {
 
       <hr class="rule" style="margin-top:6px;" />
       <div class="barcode" />
-      <div class="barnum">DIVVY · SPLIT EXPENSES</div>
+      <div class="barnum">SLATE · SPLIT EXPENSES</div>
       <div class="rhead subline" style="margin-top:2px;">*** Thank you ***</div>
     </div>
   );
@@ -151,7 +151,7 @@ function OpenGroup({ onCancel }: { onCancel: () => void }) {
 
   async function open() {
     const parsed = parseGroupLink(link);
-    if (!parsed) return setError("That doesn't look like a Divvy group link.");
+    if (!parsed) return setError("That doesn't look like a Slate group link.");
     if (!parsed.t) {
       // Token-less link — a PIN-gated group. The group screen shows the PIN
       // gate and remembers the group once the PIN checks out.

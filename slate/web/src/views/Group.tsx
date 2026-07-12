@@ -208,7 +208,7 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
       ? `${location.origin}/g/${group!.id}`
       : `${location.origin}/g/${group!.id}/${token}`;
     const data = {
-      title: `Divvy: ${group!.name}`,
+      title: `Slate: ${group!.name}`,
       text: group!.pin_on
         ? `Join our expense group "${group!.name}" — you'll need the group PIN`
         : `Join our expense group "${group!.name}"`,

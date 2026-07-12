@@ -1,4 +1,4 @@
-# Divvy
+# Slate
 
 Self-hosted expense splitting for friends and family — a low-friction Splitwise
 alternative. No accounts: create a group, share the link, and anyone with the
@@ -11,7 +11,13 @@ Couples and families can be linked into a **party** (Balances tab): they order
 individually but settle as one wallet, so group balances stay simple while the
 internal breakdown remains visible.
 
-- **PWA**: `divvy.mattrandell.com` (Cloudflare Pages) — Preact + Vite, in [`web/`](web/)
+> **Rebrand note:** this app was previously **Divvy**. The user-facing brand and
+> the PWA host are now Slate (`slate.mattrandell.com`), and `divvy.mattrandell.com`
+> 301-redirects there so old share links keep working. The backend host,
+> PocketBase routes (`/api/divvy/*`), and `DIVVY_*` env vars deliberately keep
+> the old name so already-installed apps and the running server don't break.
+
+- **PWA**: `slate.mattrandell.com` (Cloudflare Pages) — Preact + Vite, in [`web/`](web/)
 - **Backend**: `divvy-api.mattrandell.com` — PocketBase on the Home Server (Coolify,
   via the Cloudflare Tunnel), defined in [`server/`](server/)
 
@@ -22,12 +28,12 @@ See [CONTEXT.md](CONTEXT.md) for the domain language and [docs/adr/](docs/adr/) 
 ```sh
 # backend — download a pocketbase binary (v0.39.x), then from a scratch dir:
 ANTHROPIC_API_KEY=sk-... ./pocketbase serve \
-  --migrationsDir <repo>/divvy/server/pb_migrations \
-  --hooksDir <repo>/divvy/server/pb_hooks \
+  --migrationsDir <repo>/slate/server/pb_migrations \
+  --hooksDir <repo>/slate/server/pb_hooks \
   --http 127.0.0.1:8090
 
 # frontend
-cd divvy/web
+cd slate/web
 npm install
 npm run dev        # defaults to the local backend at 127.0.0.1:8090
 npm test           # split-math unit tests
@@ -39,24 +45,31 @@ Messages API response shape).
 
 ## Deployment
 
-**PWA** deploys automatically: pushes to `main` touching `divvy/web/**` run
-[`deploy-divvy-pwa.yml`](../.github/workflows/deploy-divvy-pwa.yml), which
-builds and pushes `dist/` to the `divvy-mattrandell` Pages project. The Pages
-project, custom domain, and both DNS records are Terraform-managed
-(`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`) — run
-`terraform apply` once before first deploy.
+**PWA** deploys automatically: pushes to `main` touching `slate/web/**` run
+[`deploy-slate-pwa.yml`](../.github/workflows/deploy-slate-pwa.yml), which
+builds and pushes `dist/` to the `slate-mattrandell` Pages project. The Pages
+project, custom domain, the divvy→slate redirect, and all DNS records are
+Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
+— run `terraform apply` once before first deploy.
 
 **Backend** is a Coolify app on the Home Server (same pattern as
 `inventory-api`):
 
-1. In Coolify, create an app from this repo with build context `divvy/server/`
-   (Dockerfile build).
+1. In Coolify, create an app from this repo with build context `slate/server/`
+   (Dockerfile build). *(If migrating the existing Divvy deploy, update its
+   build context from `divvy/server/` to `slate/server/` after the directory
+   rename, or the next server build fails on a missing path.)*
 2. Add a persistent volume mounted at `/pb/pb_data`.
 3. Set env vars: `ANTHROPIC_API_KEY` (required for receipt OCR);
    `RESEND_API_KEY` (required for PIN-recovery emails — see below); optionally
    `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
-   (default `Divvy <divvy@mattrandell.com>`), and `DIVVY_APP_URL` (default
-   `https://divvy.mattrandell.com`).
+   (default `Slate <slate@mattrandell.com>`), and `DIVVY_APP_URL` (default
+   `https://slate.mattrandell.com`). The `DIVVY_*` env var **names** are kept
+   from the old brand so existing deployments need no env changes — but if you
+   previously **set** `DIVVY_EMAIL_FROM` or `DIVVY_APP_URL` to divvy values,
+   update them to the slate ones so recovery emails read "Slate" and link
+   straight to slate.mattrandell.com. `slate@mattrandell.com` is on the same
+   Resend-verified `mattrandell.com` domain, so no new domain verification.
 4. Expose port 8080 and add the `divvy-api.mattrandell.com` domain so Traefik
    routes it through the existing Cloudflare Tunnel.
 5. On first boot, migrations auto-apply. Create the superuser for the admin UI

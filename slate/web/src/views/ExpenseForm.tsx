@@ -753,7 +753,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       </button>
       <hr class="rule" style="margin-top:8px;" />
       <div class="barcode" />
-      <div class="barnum">DIVVY · {date.slice(5, 7)}/{date.slice(8, 10)}/{date.slice(0, 4)}</div>
+      <div class="barnum">SLATE · {date.slice(5, 7)}/{date.slice(8, 10)}/{date.slice(0, 4)}</div>
 
       {receiptOpen && receiptRec && (
         <div class="lightbox" onClick={() => setReceiptOpen(false)}>

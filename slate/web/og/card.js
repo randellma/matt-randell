@@ -1,4 +1,4 @@
-// The Divvy link-preview card (1200×630) as an SVG string, in the app's
+// The Slate link-preview card (1200×630) as an SVG string, in the app's
 // receipt theme. Shared by scripts/build-og-assets.mjs (renders the static
 // public/og-card.png with @resvg/resvg-js) and functions/og/g/[[route]].js
 // (renders per-group cards with @resvg/resvg-wasm), so keep it runtime-neutral.
@@ -59,7 +59,7 @@ function slip(cx) {
     <path d="${slipPath}" transform="translate(7 9)" fill="${INK}" opacity="0.13"/>
     <path d="${slipPath}" fill="${PAPER}"/>
 
-    <text x="${SW / 2}" y="86" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="48" fill="${INK}" letter-spacing="14">DIVVY</text>
+    <text x="${SW / 2}" y="86" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="48" fill="${INK}" letter-spacing="14">SLATE</text>
     <text x="${SW / 2}" y="121" text-anchor="middle" font-family="Space Mono" font-size="16" fill="${FAINT}" letter-spacing="2">* * * EXPENSE GROUP * * *</text>
 
     ${dashed(152)}
@@ -77,7 +77,7 @@ function slip(cx) {
     ${dashed(446)}
 
     <g transform="translate(0 472)">${barcode()}</g>
-    <text x="${SW / 2}" y="551" text-anchor="middle" font-family="Space Mono" font-size="15" fill="${FAINT}" letter-spacing="3">DIVVY.MATTRANDELL.COM</text>
+    <text x="${SW / 2}" y="551" text-anchor="middle" font-family="Space Mono" font-size="15" fill="${FAINT}" letter-spacing="3">SLATE.MATTRANDELL.COM</text>
   </g>`;
 }
 
@@ -110,8 +110,8 @@ export function buildCardSvg(opts = {}) {
   <rect width="1200" height="630" fill="${PAPER2}"/>
 
   <!-- faint oversized wordmark behind everything -->
-  <text x="70" y="560" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">DI</text>
-  ${photo ? '' : `<text x="905" y="250" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">VY</text>`}
+  <text x="70" y="560" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">SLA</text>
+  ${photo ? '' : `<text x="905" y="250" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">TE</text>`}
 
   ${slip(photo ? 430 : 600)}
   ${photo ? polaroid(photo.dataUri, photo.caption) : ''}

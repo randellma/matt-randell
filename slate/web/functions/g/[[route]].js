@@ -76,7 +76,7 @@ export async function onRequestGet({ request, env, params }) {
   }
   if (!preview) return shell;
 
-  const title = `Join “${preview.name}” on Divvy`;
+  const title = `Join “${preview.name}” on Slate`;
   const description = preview.pin
     ? 'Tap to open — you’ll need the group PIN to join. No app, no sign-up.'
     : memberBlurb(preview.memberNames) +
@@ -91,7 +91,7 @@ export async function onRequestGet({ request, env, params }) {
     : new URL('/og-card.png', request.url).href;
   const og = `
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Divvy" />
+  <meta property="og:site_name" content="Slate" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:url" content="${escapeHtml(new URL(request.url).origin + (t ? `/g/${id}/${t}` : `/g/${id}`))}" />

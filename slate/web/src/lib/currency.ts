@@ -1,5 +1,5 @@
 /**
- * Currency metadata, formatting, and parsing. Amounts everywhere in Divvy are
+ * Currency metadata, formatting, and parsing. Amounts everywhere in Slate are
  * integers in a currency's minor units ("cents" for USD, whole yen for JPY);
  * this module is where minor-unit awareness lives, driven by Intl so we don't
  * hand-maintain an ISO 4217 table.
@@ -138,7 +138,7 @@ export function impliedRate(
   return (toMinor / 10 ** minorUnits(to)) / (fromMinor / 10 ** minorUnits(from));
 }
 
-// Region -> currency for the places Divvy users plausibly are. The 20
+// Region -> currency for the places Slate users plausibly are. The 20
 // eurozone members share one entry-per-region below; anything unlisted
 // falls back to USD.
 const EURO_REGIONS = [
