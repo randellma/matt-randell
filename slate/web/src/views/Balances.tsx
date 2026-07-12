@@ -21,10 +21,12 @@ interface Props {
   me: string;
   expenses: ExpenseRecord[];
   payments: PaymentRecord[];
+  totalSpent: number;
+  unsettled: number;
   onChanged: () => void;
 }
 
-export function Balances({ group, token, members, me, expenses, payments, onChanged }: Props) {
+export function Balances({ group, token, members, me, expenses, payments, totalSpent, unsettled, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
@@ -123,6 +125,46 @@ export function Balances({ group, token, members, me, expenses, payments, onChan
 
   return (
     <div class="stack">
+      {transfers.length > 0 && (
+        <div>
+          <div class="seclbl left" id="settle-up" style="scroll-margin-top:14px;">Settle up</div>
+          <ul class="settle-list" style="margin-top:13px;">
+            {transfers.map(t => {
+              const from = unitByKey.get(t.from)!;
+              const to = unitByKey.get(t.to)!;
+              // Show the counterparty when you're on the row; both wallets otherwise.
+              const other = meUnit?.key === from.key ? to : from;
+              return (
+                <li key={`${t.from}-${t.to}`} class="settle-row">
+                  <span class="settle-main">
+                    {meUnit && (meUnit.key === from.key || meUnit.key === to.key) ? (
+                      <Avatar initials={collectiveInitials(unitName(other))} color={colorForId(other.key)} size={30} src={unitPhoto(other)} />
+                    ) : (
+                      <span class="avatar-stack">
+                        <Avatar initials={collectiveInitials(unitName(from))} color={colorForId(from.key)} size={30} src={unitPhoto(from)} />
+                        <Avatar initials={collectiveInitials(unitName(to))} color={colorForId(to.key)} size={30} src={unitPhoto(to)} />
+                      </span>
+                    )}
+                    <span class="settle-text">
+                      <span class="settle-label">{transferLabel(from, to)}</span>
+                      <b class="settle-amt num">{fmt(t.cents)}</b>
+                    </span>
+                  </span>
+                  <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
+                    Mark paid
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <div class="wallet-stats">
+        <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{fmt(totalSpent)}</span></div>
+        <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{fmt(unsettled)}</span></div>
+      </div>
+
       <div>
         <div class="seclbl left">Balances by wallet</div>
         <ul class="balance-list">
@@ -169,40 +211,6 @@ export function Balances({ group, token, members, me, expenses, payments, onChan
         </ul>
       </div>
 
-      {transfers.length > 0 && (
-        <div>
-          <div class="seclbl left" id="settle-up" style="scroll-margin-top:14px;">Settle up</div>
-          <ul class="settle-list" style="margin-top:13px;">
-            {transfers.map(t => {
-              const from = unitByKey.get(t.from)!;
-              const to = unitByKey.get(t.to)!;
-              // Show the counterparty when you're on the row; both wallets otherwise.
-              const other = meUnit?.key === from.key ? to : from;
-              return (
-                <li key={`${t.from}-${t.to}`} class="settle-row">
-                  <span class="settle-main">
-                    {meUnit && (meUnit.key === from.key || meUnit.key === to.key) ? (
-                      <Avatar initials={collectiveInitials(unitName(other))} color={colorForId(other.key)} size={30} src={unitPhoto(other)} />
-                    ) : (
-                      <span class="avatar-stack">
-                        <Avatar initials={collectiveInitials(unitName(from))} color={colorForId(from.key)} size={30} src={unitPhoto(from)} />
-                        <Avatar initials={collectiveInitials(unitName(to))} color={colorForId(to.key)} size={30} src={unitPhoto(to)} />
-                      </span>
-                    )}
-                    <span class="settle-text">
-                      <span class="settle-label">{transferLabel(from, to)}</span>
-                      <b class="settle-amt num">{fmt(t.cents)}</b>
-                    </span>
-                  </span>
-                  <button class="btn primary small" disabled={busy} onClick={() => recordTransfer(t.from, t.to, t.cents)}>
-                    Mark paid
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
       <hr class="rule solid" />
 
       <div>

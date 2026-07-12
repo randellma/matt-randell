@@ -324,7 +324,7 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
 
       <nav class="tabs">
         <button class={tab === 'expenses' ? 'on' : ''} onClick={() => setTab('expenses')}>
-          Expenses
+          Activity
         </button>
         <button class={tab === 'balances' ? 'on' : ''} onClick={() => setTab('balances')}>
           Balances
@@ -333,11 +333,6 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
 
       {tab === 'expenses' ? (
         <>
-          <div class="wallet-stats">
-            <div class="li"><span class="nm muted">Total spent</span><span class="lead" /><span class="amt">{fmt(totalSpent)}</span></div>
-            <div class="li"><span class="nm muted">Unsettled</span><span class="lead" /><span class="amt">{fmt(unsettled)}</span></div>
-          </div>
-          <hr class="rule" />
           <div class="seclbl left">Recent expenses</div>
           <ExpenseList
             expenses={expenses}
@@ -357,6 +352,8 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
           me={me!}
           expenses={expenses}
           payments={payments}
+          totalSpent={totalSpent}
+          unsettled={unsettled}
           onChanged={reload}
         />
       )}
