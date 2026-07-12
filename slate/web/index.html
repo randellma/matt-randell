@@ -36,6 +36,13 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
+    // Native-app feel: block iOS Safari's pinch-to-zoom. The viewport meta's
+    // user-scalable=no is ignored on modern iOS, so cancel the gesture events
+    // (a WebKit-only API) directly. Double-tap zoom is handled by touch-action
+    // in the stylesheet.
+    for (const evt of ['gesturestart', 'gesturechange', 'gestureend']) {
+      document.addEventListener(evt, e => e.preventDefault(), { passive: false });
+    }
   </script>
 </body>
 </html>
