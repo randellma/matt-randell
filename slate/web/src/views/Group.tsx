@@ -556,7 +556,6 @@ function ExpenseList({
           );
         })}
       </ul>
-      <hr class="rule" />
     </>
   );
 }
