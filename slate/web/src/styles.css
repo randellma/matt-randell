@@ -43,6 +43,9 @@ body {
 .muted { color: var(--faint); }
 
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+/* kill iOS Safari's double-tap-to-zoom (and the legacy 300ms tap delay) on
+   every tappable control, so rapid taps on names/steppers don't zoom the page */
+button, input, select, textarea, a, label { touch-action: manipulation; }
 input, select, textarea {
   font: inherit;
   font-family: 'Space Mono', ui-monospace, monospace;
