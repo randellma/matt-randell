@@ -7,7 +7,7 @@ import { fetchRate } from '../lib/fx';
 import { computeNets, expenseForBalance, paymentGroupCents, suggestSettlements } from '../lib/balances';
 import { activeMembers, memberReferenced } from '../lib/member';
 import { prepareAvatarImage } from '../image';
-import { colorForId, collectiveInitials, personInitial } from '../lib/avatar';
+import { colorForId, collectiveInitials, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
 import { groupParties, partyDisplayName } from '../lib/party';
 import { forgetGroup, newToken } from '../identity';
 import { Avatar } from '../components/Avatar';
@@ -220,7 +220,7 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
         <PhotoInput busy={busy} onPick={pickGroupPhoto}>
           <Avatar
             initials={collectiveInitials(grp.name)}
-            color="#0B7A4E"
+            color={GROUP_AVATAR_COLOR}
             size={72}
             src={api.groupPhotoUrl(grp)}
           />
