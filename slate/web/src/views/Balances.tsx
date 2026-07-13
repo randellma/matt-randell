@@ -74,6 +74,14 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
   // The wallet a transfer row describes from your point of view.
   const meUnit = units.find(u => u.memberIds.includes(me));
 
+  // Transfers your wallet is party to come first; within each group, biggest first.
+  const sortedTransfers = [...transfers].sort((a, b) => {
+    const aMine = !!meUnit && (meUnit.key === a.from || meUnit.key === a.to);
+    const bMine = !!meUnit && (meUnit.key === b.from || meUnit.key === b.to);
+    if (aMine !== bMine) return aMine ? -1 : 1;
+    return b.cents - a.cents;
+  });
+
   // Payments your wallet is party to come first; within each group, biggest first.
   const sortedPayments = [...payments].sort((a, b) => {
     const aMine = !!meUnit && (meUnit.memberIds.includes(a.from_member) || meUnit.memberIds.includes(a.to_member));
@@ -138,7 +146,7 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
         <div>
           <div class="seclbl left" id="settle-up" style="scroll-margin-top:14px;">Settle up</div>
           <ul class="settle-list" style="margin-top:13px;">
-            {transfers.map(t => {
+            {sortedTransfers.map(t => {
               const from = unitByKey.get(t.from)!;
               const to = unitByKey.get(t.to)!;
               // Show the counterparty when you're on the row; both wallets otherwise.
