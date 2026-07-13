@@ -13,6 +13,7 @@ import {
 } from '../lib/balances';
 import { colorForBalance, colorForId, collectiveInitials } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
+import { useConfirm } from '../components/ConfirmDialog';
 
 interface Props {
   group: GroupRecord;
@@ -31,6 +32,7 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const confirm = useConfirm();
 
   function toggleExpanded(key: string) {
     setExpanded(prev => {
@@ -95,14 +97,21 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
     }
   }
 
-  function recordTransfer(fromKey: string, toKey: string, cents: number) {
+  async function recordTransfer(fromKey: string, toKey: string, cents: number) {
     const fromUnit = unitByKey.get(fromKey)!;
     const toUnit = unitByKey.get(toKey)!;
     // Representatives: within each party, the person deepest in the red pays,
     // the person most in the black receives — keeps internal breakdowns sane.
     const from = [...fromUnit.memberCents].sort((a, b) => a.cents - b.cents)[0]!.member;
     const to = [...toUnit.memberCents].sort((a, b) => b.cents - a.cents)[0]!.member;
-    if (!confirm(`Record that ${unitName(fromUnit)} paid ${unitName(toUnit)} ${fmt(cents)}?`)) return;
+    if (
+      !(await confirm({
+        title: 'Record this payment?',
+        message: `${unitName(fromUnit)} paid ${unitName(toUnit)} ${fmt(cents)}.`,
+        confirmLabel: 'Record',
+      }))
+    )
+      return;
     run(async () => {
       await api.createPayment(
         {
@@ -120,8 +129,16 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
     });
   }
 
-  function deletePayment(p: PaymentRecord) {
-    if (!confirm(`Remove payment ${nameOf(p.from_member)} → ${nameOf(p.to_member)} ${formatMoney(p.amount_cents, p.currency || groupCurrency)}?`)) return;
+  async function deletePayment(p: PaymentRecord) {
+    if (
+      !(await confirm({
+        title: 'Remove this payment?',
+        message: `${nameOf(p.from_member)} → ${nameOf(p.to_member)} ${formatMoney(p.amount_cents, p.currency || groupCurrency)}`,
+        confirmLabel: 'Remove',
+        danger: true,
+      }))
+    )
+      return;
     run(() => api.deletePayment(p.id, token));
   }
 

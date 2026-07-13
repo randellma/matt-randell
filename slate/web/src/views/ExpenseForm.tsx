@@ -23,6 +23,7 @@ import { colorForId, personInitial } from '../lib/avatar';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 import { PdfPages, PdfThumb } from '../components/PdfViewer';
+import { useConfirm } from '../components/ConfirmDialog';
 
 interface Props {
   group: GroupRecord;
@@ -42,6 +43,7 @@ const MODES: { id: SplitMode; label: string }[] = [
 
 export function ExpenseForm({ group, token, members, me, expense, onDone }: Props) {
   const groupCurrency = group.currency || 'USD';
+  const confirm = useConfirm();
 
   // The roster to choose from: active members, plus anyone already on the
   // expense being edited even if they've since been removed — a removed member
@@ -151,8 +153,17 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
-  function leave() {
-    if (dirty && !confirm('Discard unsaved changes to this expense?')) return;
+  async function leave() {
+    if (
+      dirty &&
+      !(await confirm({
+        title: 'Discard changes?',
+        message: 'This expense has unsaved changes. Leave without saving them?',
+        confirmLabel: 'Discard',
+        danger: true,
+      }))
+    )
+      return;
     onDone();
   }
 
@@ -444,7 +455,15 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
   async function remove() {
     if (!expense) return;
-    if (!confirm(`Delete "${expense.description}"?`)) return;
+    if (
+      !(await confirm({
+        title: `Delete “${expense.description}”?`,
+        message: 'This expense will be removed from the slate. This can’t be undone.',
+        confirmLabel: 'Delete',
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await api.deleteExpense(expense.id, token);
