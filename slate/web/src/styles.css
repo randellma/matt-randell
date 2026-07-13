@@ -263,7 +263,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 32px; height: 32px; color: var(--faint);
-  border: 1.5px dashed var(--line); border-radius: 8px;
+  border: 1.5px dashed var(--ink); border-radius: 8px;
   background: none; cursor: pointer; transition: 0.12s;
 }
 .icon-btn:active { background: var(--paper2); color: var(--ink); }
@@ -579,24 +579,85 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 @keyframes sheet-up { from { transform: translateY(30%); opacity: 0.6; } to { transform: none; opacity: 1; } }
 .sheet h2 { font-family: 'Space Mono', ui-monospace, monospace; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink); }
 
-/* share-code footer — the group's QR sits above the receipt sign-off */
-.qr-share { display: flex; align-items: center; gap: 16px; padding: 2px 2px 0; }
-.qr-share canvas { width: 94px; height: 94px; flex: none; image-rendering: pixelated; }
-.qr-share-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.qr-share-title {
+/* invite button at the foot of the receipt — opens the share drawer */
+.invite-btn {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; padding: 11px; border: 1.5px dashed var(--line); border-radius: 6px;
+  background: none; color: var(--ink); cursor: pointer; transition: 0.12s;
   font-family: 'Space Mono', ui-monospace, monospace;
-  font-weight: 700; font-size: 0.66rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink);
+  font-weight: 700; font-size: 0.69rem; letter-spacing: 0.12em; text-transform: uppercase;
 }
-.qr-share-hint { font-size: 0.84rem; line-height: 1.5; color: var(--faint); text-align: left; }
-.qr-toggle {
-  padding: 5px 11px; border: 1.5px dashed var(--line); border-radius: 6px; background: none; color: var(--faint);
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-weight: 700; font-size: 0.63rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+.invite-btn:active { background: var(--paper2); }
+.invite-btn svg { flex: none; }
+
+/* the invite drawer — a bottom sheet with the two ways into a group */
+.share-overlay {
+  position: fixed; inset: 0; z-index: 25;
+  background: rgba(11, 18, 13, 0.52);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  animation: fade-in 0.18s ease-out;
 }
-.qr-toggle:active { background: var(--paper2); }
-.qr-hidden { display: flex; align-items: center; gap: 12px; border: 1.5px dashed var(--line); border-radius: 6px; padding: 11px 14px; }
-.qr-hidden span { flex: 1; font-size: 0.84rem; color: var(--faint); text-align: left; }
-.qr-hidden .qr-toggle { color: var(--ink); }
+.share-sheet {
+  width: 100%; max-width: 27rem;
+  background: var(--paper);
+  background-image: repeating-linear-gradient(0deg, rgba(32, 38, 31, 0.028) 0 1px, transparent 1px 26px);
+  border-radius: 22px 22px 0 0;
+  padding: 12px 20px calc(22px + env(safe-area-inset-bottom));
+  box-shadow: 0 -22px 44px -20px rgba(0, 0, 0, 0.6);
+  animation: share-sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: 90%; overflow-y: auto;
+}
+@keyframes share-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+.share-handle { align-self: center; flex: none; width: 38px; height: 4px; border-radius: 2px; background: var(--line); }
+.share-head { display: flex; align-items: flex-start; gap: 10px; }
+.share-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.share-title { font-weight: 800; font-size: 1.25rem; line-height: 1.05; color: var(--ink); }
+.share-sub { font-size: 0.84rem; line-height: 1.45; color: var(--faint); }
+.share-close {
+  width: 30px; height: 30px; flex: none;
+  border: 1.5px dashed var(--line); border-radius: 8px; background: none; color: var(--faint);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Mono', ui-monospace, monospace; font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.share-close:active { background: var(--paper2); color: var(--ink); }
+
+/* in person — the QR on a white card, like a printed slip */
+.share-qr { display: flex; flex-direction: column; align-items: center; gap: 11px; }
+.share-qr-card {
+  background: #FFFEF8; border-radius: 16px; padding: 12px;
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--line);
+}
+.share-qr-card canvas { width: 208px; height: 208px; display: block; image-rendering: pixelated; }
+.share-qr-hint { font-size: 0.84rem; line-height: 1.45; color: var(--faint); text-align: center; max-width: 250px; }
+
+/* send a link — the URL in a dashed box with a copy button */
+.share-link-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1.5px dashed var(--line); border-radius: 8px; padding: 5px 6px 5px 14px;
+}
+.share-link-url {
+  flex: 1; min-width: 0; font-weight: 700; font-size: 0.84rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.share-copy {
+  flex: none; font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.69rem; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 9px 14px; border-radius: 6px; cursor: pointer; transition: 0.12s;
+  border: 2px solid var(--accent); background: var(--accent); color: #fff;
+}
+.share-copy.done { border: 2px dashed var(--line); background: transparent; color: var(--green); }
+
+/* adaptive secondary action — OS share sheet, or a mailto: fallback */
+.share-action {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px; border: 1.5px dashed var(--line); border-radius: 8px;
+  background: none; color: var(--ink); cursor: pointer; transition: 0.12s;
+}
+.share-action:active { background: var(--paper2); }
+.share-action svg { flex: none; }
+.share-action span { font-weight: 700; font-size: 0.88rem; }
+.share-action-hint { font-size: 0.75rem; line-height: 1.4; color: var(--faint); text-align: center; margin-top: -6px; }
 .thanks {
   text-align: center; font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 0.69rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 2px;
