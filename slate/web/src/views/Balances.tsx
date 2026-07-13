@@ -71,6 +71,17 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
   };
   const transfers = suggestSettlements(unitNets(visibleUnits));
 
+  // The wallet a transfer row describes from your point of view.
+  const meUnit = units.find(u => u.memberIds.includes(me));
+
+  // Payments your wallet is party to come first; within each group, biggest first.
+  const sortedPayments = [...payments].sort((a, b) => {
+    const aMine = !!meUnit && (meUnit.memberIds.includes(a.from_member) || meUnit.memberIds.includes(a.to_member));
+    const bMine = !!meUnit && (meUnit.memberIds.includes(b.from_member) || meUnit.memberIds.includes(b.to_member));
+    if (aMine !== bMine) return aMine ? -1 : 1;
+    return paymentGroupCents(b, groupCurrency) - paymentGroupCents(a, groupCurrency);
+  });
+
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError('');
@@ -114,8 +125,6 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
     run(() => api.deletePayment(p.id, token));
   }
 
-  // The wallet a transfer row describes from your point of view.
-  const meUnit = units.find(u => u.memberIds.includes(me));
   const transferLabel = (from: UnitBalance, to: UnitBalance) => {
     const pays = from.memberIds.length > 1 ? 'pay' : 'pays';
     if (meUnit?.key === from.key) return `You pay ${unitName(to)}`;
@@ -217,7 +226,7 @@ export function Balances({ group, token, members, me, expenses, payments, totalS
         <div class="seclbl left">Payments</div>
         {payments.length > 0 && (
           <ul class="payment-list" style="margin-top:11px;">
-            {payments.map(p => (
+            {sortedPayments.map(p => (
               <li key={p.id}>
                 <span>
                   {p.date.slice(0, 10)} · {nameOf(p.from_member)} → {nameOf(p.to_member)}{' '}
