@@ -18,7 +18,7 @@ import { partyDisplayName } from '../lib/party';
 import { activeMembers } from '../lib/member';
 import { colorForId, collectiveInitials, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
 import { Avatar, AvatarStack } from '../components/Avatar';
-import { ShareQr } from '../components/ShareQr';
+import { ShareDrawer } from '../components/ShareDrawer';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
 import { GroupSettings } from './GroupSettings';
@@ -38,7 +38,7 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'expenses' | 'balances'>('expenses');
   const [me, setMe] = useState<string | undefined>(getJoinedGroup(groupId)?.memberId);
-  const [shared, setShared] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   // The working credential: from the URL on full links, from localStorage on
   // token-less ones. Empty until the PIN gate hands one over.
   const [token, setToken] = useState(urlToken ?? getJoinedGroup(groupId)?.t ?? '');
@@ -210,26 +210,6 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
     ? `${location.origin}/g/${group.id}`
     : `${location.origin}/g/${group.id}/${token}`;
 
-  async function share() {
-    const url = shareUrl;
-    const data = {
-      title: `Slate: ${group!.name}`,
-      text: group!.pin_on
-        ? `Join our expense group "${group!.name}" — you'll need the group PIN`
-        : `Join our expense group "${group!.name}"`,
-      url,
-    };
-    if (navigator.share) {
-      try {
-        await navigator.share(data);
-        return;
-      } catch { /* cancelled — fall through to clipboard */ }
-    }
-    await navigator.clipboard.writeText(url);
-    setShared(true);
-    setTimeout(() => setShared(false), 2000);
-  }
-
   // Your position, for the slate board and the expenses-tab totals. "You"
   // means your wallet: yourself, or your whole party if you're linked.
   const groupCurrency = group.currency || 'USD';
@@ -295,18 +275,12 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
             </button>
-            <button class="icon-btn" title={shared ? 'Copied!' : 'Share group'} aria-label="Share group" onClick={share}>
-              {shared ? (
-                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 15V4" />
-                  <path d="M8 7l4-4 4 4" />
-                  <path d="M5 13v7h14v-7" />
-                </svg>
-              )}
+            <button class="icon-btn" title="Add people" aria-label="Add people to this group" onClick={() => setShareOpen(true)}>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M19 8v6M22 11h-6" />
+              </svg>
             </button>
           </div>
         </div>
@@ -359,8 +333,23 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
       )}
 
       <hr class="rule" style="margin-top:4px;" />
-      <ShareQr groupId={group.id} url={shareUrl} pinOn={group.pin_on} />
+      <button class="invite-btn" onClick={() => setShareOpen(true)}>
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M19 8v6M22 11h-6" />
+        </svg>
+        Add people to this slate
+      </button>
       <div class="thanks">*** Thank you ***</div>
+
+      <ShareDrawer
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        groupName={group.name}
+        url={shareUrl}
+        pinOn={group.pin_on}
+      />
 
       <button class="fab" onClick={() => navigate(groupPath(groupId, linkToken, '/new'))} aria-label="Add expense">
         <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
