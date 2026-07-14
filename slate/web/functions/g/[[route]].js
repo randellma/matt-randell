@@ -9,6 +9,11 @@
 
 const DEFAULT_PB_URL = 'https://divvy-api.mattrandell.com';
 
+// Bump when the card template (og/card.js) changes — it's folded into the
+// og:image ?v= so a redesign busts the edge cache even when a group's name
+// and roster are unchanged. Without it, template changes never reach crawlers.
+const CARD_VERSION = '2';
+
 const escapeHtml = (s) =>
   s.replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
@@ -53,9 +58,10 @@ async function fetchGroupPreview(pbUrl, id, t) {
   return { name: group.name, photo: group.photo, memberNames: members.map((m) => m.name), pin: false };
 }
 
-/** Cache-buster for the dynamic card: changes when the name or roster does. */
+/** Cache-buster for the dynamic card: changes when the template, name, or
+    roster does. */
 async function cardVersion(preview) {
-  const bytes = new TextEncoder().encode(`${preview.name}|${preview.memberNames.join(',')}`);
+  const bytes = new TextEncoder().encode(`${CARD_VERSION}|${preview.name}|${preview.memberNames.join(',')}`);
   const digest = await crypto.subtle.digest('SHA-1', bytes);
   return [...new Uint8Array(digest).slice(0, 6)]
     .map((b) => b.toString(16).padStart(2, '0'))
