@@ -36,9 +36,11 @@ const appIcon = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http
   <text x="256" y="322" text-anchor="middle" font-family="Space Mono" font-weight="700"
         font-size="320" fill="${CHALK}" letter-spacing="0">S</text>
 
-  <!-- three-asterisk motif from the live app, in muted chalk -->
-  <text x="269" y="436" text-anchor="middle" font-family="Space Mono" font-weight="700"
-        font-size="66" fill="${CHALKMUT}" letter-spacing="44">***</text>
+  <!-- three-asterisk motif from the live app, in muted chalk. Spaced with
+       space glyphs (not letter-spacing, whose trailing gap offsets the run)
+       so the block stays centered on x=256, flush under the S. -->
+  <text x="256" y="436" text-anchor="middle" font-family="Space Mono" font-weight="700"
+        font-size="66" fill="${CHALKMUT}">* * *</text>
 </svg>`;
 
 // Favicon: same S-on-slate, but bigger and rule-less so it stays legible at
