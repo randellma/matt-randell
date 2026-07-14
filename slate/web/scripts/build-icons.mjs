@@ -2,8 +2,9 @@
 //   - public/icons/icon-192.png, -512.png  PWA / home-screen icons (maskable)
 //   - public/favicon-32.png, -16.png       browser-tab favicons
 // Both marks are chalk-on-slate: the "S" wordmark initial in Space Mono over
-// the charcoal slate board. The home-screen icon adds a dashed chalk ledger
-// rule; the favicon drops it (illegible at 16-32px) and just fills with the S.
+// the charcoal slate board. The home-screen icon adds the app's three-asterisk
+// motif beneath the S; the favicon drops it (illegible at 16-32px) and just
+// fills with the S.
 // Run after changing the icon design: node scripts/build-icons.mjs
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -32,12 +33,12 @@ const appIcon = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http
   <rect width="512" height="512" fill="url(#board)"/>
 
   <!-- chalk "S" wordmark initial, the hero mark -->
-  <text x="256" y="330" text-anchor="middle" font-family="Space Mono" font-weight="700"
+  <text x="256" y="322" text-anchor="middle" font-family="Space Mono" font-weight="700"
         font-size="320" fill="${CHALK}" letter-spacing="0">S</text>
 
-  <!-- dashed chalk rule — the app's perforated ledger separator -->
-  <line x1="168" y1="392" x2="344" y2="392" stroke="${CHALKMUT}" stroke-width="11"
-        stroke-linecap="round" stroke-dasharray="2 32"/>
+  <!-- three-asterisk motif from the live app, in muted chalk -->
+  <text x="269" y="436" text-anchor="middle" font-family="Space Mono" font-weight="700"
+        font-size="66" fill="${CHALKMUT}" letter-spacing="44">***</text>
 </svg>`;
 
 // Favicon: same S-on-slate, but bigger and rule-less so it stays legible at

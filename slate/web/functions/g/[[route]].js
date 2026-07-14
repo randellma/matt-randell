@@ -53,9 +53,9 @@ async function fetchGroupPreview(pbUrl, id, t) {
   return { name: group.name, photo: group.photo, memberNames: members.map((m) => m.name), pin: false };
 }
 
-/** Cache-buster for the dynamic card: changes when the photo or name does. */
+/** Cache-buster for the dynamic card: changes when the name or roster does. */
 async function cardVersion(preview) {
-  const bytes = new TextEncoder().encode(`${preview.photo}|${preview.name}`);
+  const bytes = new TextEncoder().encode(`${preview.name}|${preview.memberNames.join(',')}`);
   const digest = await crypto.subtle.digest('SHA-1', bytes);
   return [...new Uint8Array(digest).slice(0, 6)]
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -81,14 +81,13 @@ export async function onRequestGet({ request, env, params }) {
     ? 'Tap to open — you’ll need the group PIN to join. No app, no sign-up.'
     : memberBlurb(preview.memberNames) +
       'Tap to see the group and add your expenses — no app, no sign-up.';
-  // Groups with a photo get a card with the avatar composited in (rendered by
-  // functions/og/g/[[route]].js); the rest share the static branded card.
+  // Every group gets a hero card named for it (rendered by
+  // functions/og/g/[[route]].js); the ?v= content hash lets a good render be
+  // cached hard, and any render failure there falls back to the static card.
   const ogPath = t
     ? `/og/g/${encodeURIComponent(id)}/${encodeURIComponent(t)}/card.png`
     : `/og/g/${encodeURIComponent(id)}/card.png`;
-  const image = preview.photo
-    ? new URL(`${ogPath}?v=${await cardVersion(preview)}`, request.url).href
-    : new URL('/og-card.png', request.url).href;
+  const image = new URL(`${ogPath}?v=${await cardVersion(preview)}`, request.url).href;
   const og = `
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Slate" />

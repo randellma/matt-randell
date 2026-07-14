@@ -1,120 +1,165 @@
-// The Slate link-preview card (1200×630) as an SVG string, in the app's
-// receipt theme. Shared by scripts/build-og-assets.mjs (renders the static
-// public/og-card.png with @resvg/resvg-js) and functions/og/g/[[route]].js
-// (renders per-group cards with @resvg/resvg-wasm), so keep it runtime-neutral.
+// The Slate link-preview card (1200×630) as an SVG string, in the app's slate
+// theme — the charcoal board hero that mirrors the in-app invite. Shared by
+// scripts/build-og-assets.mjs (renders the static public/og-card.png with
+// @resvg/resvg-js) and functions/og/g/[[route]].js (renders per-group cards
+// with @resvg/resvg-wasm), so keep it runtime-neutral. Everything is set in
+// Space Mono, the only face the og rasteriser bundles.
 
-const INK = '#20261F';
-const PAPER = '#FAF7EF';
-const PAPER2 = '#F2EEE1';
-const FAINT = '#9A9683';
-const LINE = '#CDC8B4';
-const ACCENT = '#0B7A4E';
+import { colorForId, personInitial } from './avatar.js';
 
-// receipt slip geometry (local coords)
-const SW = 470; // slip width
-const SH = 588; // slip height
-const ZIG = 10; // zigzag tooth height
-const TOOTH = 23.5; // tooth width (SW / 20)
+const SLATE = '#26292B'; // board
+const CHALK = '#F2EEE2'; // primary mark
+const CHALKMUT = '#B4B7AB'; // muted chalk, for the sub-line
+const FAINT = '#8B948B'; // faint mono, for the footnote
+const EMERALD = '#7FBF9E'; // badge text
+const EMERALD_LINE = '#3E7D5D'; // badge border
+const INK = '#0B120D'; // text on the chalk CTA pill
+const STROKE = '#26292B'; // avatar tile ring (matches the board)
+
+const CW = 1200;
+const CH = 630;
+const PAD = 72;
+const ADV = 0.6; // Space Mono glyph advance, in em
 
 const escapeXml = (s) =>
   s.replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
 
-function zigzagTop() {
-  let d = `M0 ${ZIG}`;
-  for (let i = 0; i < SW / TOOTH; i++) {
-    d += ` l${TOOTH / 2} ${-ZIG} l${TOOTH / 2} ${ZIG}`;
-  }
-  return d;
-}
-function zigzagBottom() {
-  let d = `L${SW} ${SH - ZIG}`;
-  for (let i = 0; i < SW / TOOTH; i++) {
-    d += ` l${-TOOTH / 2} ${ZIG} l${-TOOTH / 2} ${-ZIG}`;
-  }
-  return d + ' Z';
-}
-const slipPath = `${zigzagTop()} L${SW} ${ZIG} ${zigzagBottom()}`;
+/** Rendered width of a Space Mono run at a given size and letter-spacing. */
+const runWidth = (text, size, ls = 0) =>
+  text.length * ADV * size + Math.max(0, text.length - 1) * ls;
 
-function barcode() {
-  const bars = [];
-  let bx = 85;
-  const seq = [3, 1, 2, 1, 4, 2, 1, 3, 1, 1, 2, 4, 1, 2, 3, 1, 1, 2, 1, 3, 2, 1, 4, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 4, 1, 2, 1, 1, 3, 2];
-  for (const w of seq) {
-    bars.push(`<rect x="${bx}" y="0" width="${w * 2}" height="42" fill="${INK}"/>`);
-    bx += w * 2 + 4;
-  }
-  return bars.join('');
-}
-
-const dashed = (y) =>
-  `<line x1="40" y1="${y}" x2="${SW - 40}" y2="${y}" stroke="${LINE}" stroke-width="2" stroke-dasharray="7 6"/>`;
-
-const item = (y, text) =>
-  `<text x="45" y="${y}" font-family="Space Mono" font-size="22" fill="${INK}" xml:space="preserve">${text}</text>`;
-
-function slip(cx) {
-  return `<g transform="translate(${cx} 316) rotate(-2) translate(${-SW / 2} ${-SH / 2})">
-    <path d="${slipPath}" transform="translate(7 9)" fill="${INK}" opacity="0.13"/>
-    <path d="${slipPath}" fill="${PAPER}"/>
-
-    <text x="${SW / 2}" y="86" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="48" fill="${INK}" letter-spacing="14">SLATE</text>
-    <text x="${SW / 2}" y="121" text-anchor="middle" font-family="Space Mono" font-size="16" fill="${FAINT}" letter-spacing="2">* * * EXPENSE GROUP * * *</text>
-
-    ${dashed(152)}
-
-    ${item(199, 'SPLIT BILLS ....... FAIR')}
-    ${item(243, 'SETTLE UP ......... EASY')}
-    ${item(287, 'SIGN-UP ........... NONE')}
-    ${item(331, 'PRICE ............ $0.00')}
-
-    ${dashed(366)}
-
-    <text x="45" y="415" font-family="Space Mono" font-weight="700" font-size="27" fill="${INK}">TOTAL</text>
-    <text x="${SW - 45}" y="415" text-anchor="end" font-family="Space Mono" font-weight="700" font-size="27" fill="${ACCENT}">TAP TO JOIN</text>
-
-    ${dashed(446)}
-
-    <g transform="translate(0 472)">${barcode()}</g>
-    <text x="${SW / 2}" y="551" text-anchor="middle" font-family="Space Mono" font-size="15" fill="${FAINT}" letter-spacing="3">SLATE.MATTRANDELL.COM</text>
+/** A pill-shaped label with a rule border — the "You're invited" badge. */
+function badge(label, size = 21, ls = 3) {
+  const padX = 18;
+  const h = 46;
+  const w = runWidth(label, size, ls) + padX * 2;
+  const x = CW - PAD - w;
+  const y = PAD;
+  return `<g>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="none" stroke="${EMERALD_LINE}" stroke-width="3"/>
+    <text x="${x + w / 2}" y="${y + h / 2 + size * 0.35}" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="${size}" letter-spacing="${ls}" fill="${EMERALD}">${escapeXml(label)}</text>
   </g>`;
 }
 
-const stamp = (transform) => `<g transform="${transform}" opacity="0.92">
-    <rect x="-160" y="-40" width="320" height="80" rx="12" fill="none" stroke="${ACCENT}" stroke-width="4"/>
-    <rect x="-152" y="-32" width="304" height="64" rx="8" fill="none" stroke="${ACCENT}" stroke-width="2"/>
-    <text x="0" y="10" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="29" fill="${ACCENT}" letter-spacing="2">YOU'RE INVITED</text>
-  </g>`;
+/** Overlapping row of member avatar tiles, capped with a +N overflow tile. */
+function memberStack(members, x, cy) {
+  const tile = 64;
+  const step = 46; // overlap
+  const rx = 15;
+  const max = 5;
+  const shown = members.slice(0, max);
+  const overflow = members.length - shown.length;
+  const cells = shown.map((m) => ({
+    fill: colorForId(m.id),
+    label: personInitial(m.name),
+  }));
+  if (overflow > 0) cells.push({ fill: '#3A4139', label: `+${overflow}` });
 
-/** Group photo as a tilted polaroid print next to the slip. */
-function polaroid(dataUri, caption) {
-  const shown = [...caption].length > 20 ? [...caption].slice(0, 19).join('') + '…' : caption;
-  return `<g transform="translate(855 320) rotate(5)">
-    <rect x="-163" y="-192" width="340" height="396" transform="translate(6 9)" fill="${INK}" opacity="0.13"/>
-    <rect x="-170" y="-198" width="340" height="396" fill="#FFFEFA"/>
-    <image href="${dataUri}" x="-150" y="-178" width="300" height="300" preserveAspectRatio="xMidYMid slice"/>
-    <rect x="-150" y="-178" width="300" height="300" fill="none" stroke="${LINE}" stroke-width="1"/>
-    <text x="0" y="170" text-anchor="middle" font-family="Space Mono" font-size="22" fill="${INK}">${escapeXml(shown)}</text>
-  </g>`;
+  const y = cy - tile / 2;
+  const tiles = cells.map((c, i) => {
+    const tx = x + i * step;
+    const fs = c.label.length > 1 ? 22 : 30;
+    return `<g>
+      <rect x="${tx}" y="${y}" width="${tile}" height="${tile}" rx="${rx}" fill="${c.fill}" stroke="${STROKE}" stroke-width="4"/>
+      <text x="${tx + tile / 2}" y="${cy + fs * 0.34}" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="${fs}" fill="#FFFFFF">${escapeXml(c.label)}</text>
+    </g>`;
+  });
+  const endX = x + (cells.length - 1) * step + tile;
+  return { svg: tiles.join(''), endX };
 }
 
 /**
- * @param {{ photo?: { dataUri: string, caption: string } }} [opts]
- *   photo — group avatar as a data URI plus the group name for the caption;
- *   omitted, the card is the generic branded one.
+ * @param {{ name?: string, members?: {id:string,name:string}[], memberCount?: number }} [opts]
+ *   name — the group name for a per-group invite card; omitted, the card is the
+ *   generic branded one. members — member records for the avatar stack (empty
+ *   for a PIN-gated group, whose roster stays private). memberCount — total
+ *   member count when known (may exceed members.length).
  */
 export function buildCardSvg(opts = {}) {
-  const { photo } = opts;
-  return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="630" fill="${PAPER2}"/>
+  const { name, members = [], memberCount } = opts;
+  const invite = Boolean(name);
 
-  <!-- faint oversized wordmark behind everything -->
-  <text x="70" y="560" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">SLA</text>
-  ${photo ? '' : `<text x="905" y="250" font-family="Space Mono" font-weight="700" font-size="230" fill="${LINE}" opacity="0.35" letter-spacing="6">TE</text>`}
+  // Headline: the group name (fitted + truncated to one line) or the tagline.
+  let headline = invite ? name.trim() : 'Split expenses\nwithout the fuss';
+  let headSize = 84;
+  if (invite) {
+    const maxW = CW - PAD * 2;
+    headSize = Math.min(84, Math.floor(maxW / (headline.length * ADV)));
+    if (headSize < 40) {
+      const fit = Math.max(1, Math.floor(maxW / (40 * ADV)) - 1);
+      headline = [...headline].slice(0, fit).join('').trimEnd() + '…';
+      headSize = 40;
+    }
+  }
+  const headLines = headline.split('\n');
+  const headLineH = (invite ? headSize : 68) * 1.06;
+  const headTop = 300 - ((headLines.length - 1) * headLineH) / 2;
+  const headSvg = headLines
+    .map(
+      (ln, i) =>
+        `<text x="${PAD}" y="${headTop + i * headLineH + (invite ? headSize : 68) * 0.75}" font-family="Space Mono" font-weight="700" font-size="${invite ? headSize : 68}" letter-spacing="1" fill="${CHALK}">${escapeXml(ln)}</text>`,
+    )
+    .join('');
 
-  ${slip(photo ? 430 : 600)}
-  ${photo ? polaroid(photo.dataUri, photo.caption) : ''}
-  ${photo ? stamp('translate(742 96) rotate(-5)') : stamp('translate(878 130) rotate(7)')}
+  // Sub-line: member stack + count for a rostered invite, tagline otherwise.
+  const stackCy = 430;
+  const count = memberCount ?? members.length;
+  let stackSvg = '';
+  let subText;
+  let subX = PAD;
+  if (invite && members.length > 0) {
+    const stack = memberStack(members, PAD, stackCy);
+    stackSvg = stack.svg;
+    subX = stack.endX + 22;
+    subText = `${count} ${count === 1 ? 'person' : 'people'} in · split fair, settle easy`;
+  } else if (invite) {
+    subText = 'Split fair · settle easy · no sign-up';
+  } else {
+    subText = 'No accounts · no sign-ups · split it fair';
+  }
+  const subSvg = `<text x="${subX}" y="${stackCy + 8}" font-family="Space Mono" font-size="24" fill="${CHALKMUT}">${escapeXml(subText)}</text>`;
+
+  // CTA pill + footnote along the bottom.
+  const cta = invite ? 'Tap to join ›' : 'Open Slate ›';
+  const ctaSize = 26;
+  const ctaPadX = 26;
+  const ctaH = 58;
+  const ctaW = runWidth(cta, ctaSize) + ctaPadX * 2;
+  const ctaY = CH - PAD - ctaH;
+  const footnote = invite ? 'No account · no sign-up' : 'slate.mattrandell.com';
+  const ctaSvg = `<g>
+    <rect x="${PAD}" y="${ctaY}" width="${ctaW}" height="${ctaH}" rx="12" fill="${CHALK}"/>
+    <text x="${PAD + ctaW / 2}" y="${ctaY + ctaH / 2 + ctaSize * 0.34}" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="${ctaSize}" fill="${INK}">${escapeXml(cta)}</text>
+    <text x="${PAD + ctaW + 26}" y="${ctaY + ctaH / 2 + 8}" font-family="Space Mono" font-size="22" fill="${FAINT}">${escapeXml(footnote)}</text>
+  </g>`;
+
+  return `<svg width="${CW}" height="${CH}" viewBox="0 0 ${CW} ${CH}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="hi1" cx="84%" cy="-8%" r="62%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="hi2" cx="6%" cy="112%" r="58%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${CW}" height="${CH}" fill="${SLATE}"/>
+  <rect width="${CW}" height="${CH}" fill="url(#hi1)"/>
+  <rect width="${CW}" height="${CH}" fill="url(#hi2)"/>
+
+  <!-- giant ghost wordmark initial, clipped to the bottom-right corner -->
+  <text x="1216" y="812" text-anchor="end" font-family="Space Mono" font-weight="700" font-size="820" fill="${CHALK}" opacity="0.05">S</text>
+
+  <!-- wordmark + invite badge -->
+  <text x="${PAD}" y="${PAD + 34}" font-family="Space Mono" font-weight="700" font-size="46" letter-spacing="16" fill="${CHALK}">SLATE</text>
+  ${badge(invite ? "YOU'RE INVITED" : 'SPLIT & SETTLE')}
+
+  ${headSvg}
+  ${stackSvg}
+  ${subSvg}
+  ${ctaSvg}
 </svg>`;
 }

@@ -1,9 +1,9 @@
 // Renders the per-group link-preview image (/og/g/:id/:t/card.png — or
 // /og/g/:id/card.png for PIN-gated groups, whose links carry no token): the
-// receipt card from og/card.js with the group's avatar composited in as a
-// polaroid, rasterized with resvg's wasm build. functions/g/[[route]].js
-// points og:image here when the group has a photo; any failure falls back to
-// the static branded card so a crawler always gets an image.
+// slate hero card from og/card.js, named for the group with its member roster
+// as an avatar stack, rasterized with resvg's wasm build. functions/g/[[route]].js
+// points og:image here for every group; any failure falls back to the static
+// branded card so a crawler always gets an image.
 
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
@@ -15,40 +15,39 @@ const DEFAULT_PB_URL = 'https://divvy-api.mattrandell.com';
 // initWasm rejects a second call, so kick it off once per isolate.
 const wasmReady = initWasm(resvgWasm);
 
-function toBase64(bytes) {
-  let s = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    s += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(s);
-}
-
 async function renderCard(pbUrl, id, t) {
   const signal = AbortSignal.timeout(4000);
-  // Without a token (PIN-gated group) the security route reveals name+photo;
-  // with one, read the record like the app does.
-  const groupRes = await fetch(
-    t
-      ? `${pbUrl}/api/collections/groups/records/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`
-      : `${pbUrl}/api/divvy/groups/${encodeURIComponent(id)}/security`,
-    { signal },
-  );
-  if (!groupRes.ok) return null;
-  const group = await groupRes.json();
-  if (!t && !group.pin) return null;
-  if (!group.photo) return null;
 
-  const photoRes = await fetch(
-    `${pbUrl}/api/files/groups/${encodeURIComponent(id)}/${encodeURIComponent(group.photo)}`,
-    { signal },
-  );
-  if (!photoRes.ok) return null;
-  const mime = photoRes.headers.get('content-type') || 'image/jpeg';
-  const dataUri = `data:${mime};base64,${toBase64(new Uint8Array(await photoRes.arrayBuffer()))}`;
+  let name;
+  let members = [];
+  if (t) {
+    // Token link: read the record and roster like the app does — the roster
+    // drives the avatar stack (ids fix each tile's color, names its initial).
+    const [groupRes, membersRes] = await Promise.all([
+      fetch(`${pbUrl}/api/collections/groups/records/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`, { signal }),
+      fetch(
+        `${pbUrl}/api/collections/members/records?filter=${encodeURIComponent(`group='${id}'`)}&sort=created&perPage=50&t=${encodeURIComponent(t)}`,
+        { signal },
+      ),
+    ]);
+    if (!groupRes.ok) return null;
+    name = (await groupRes.json()).name;
+    const items = membersRes.ok ? ((await membersRes.json()).items ?? []) : [];
+    members = items.map((m) => ({ id: m.id, name: m.name }));
+  } else {
+    // Token-less link: a PIN-gated group. The security route reveals just the
+    // name (never the roster — that stays behind the PIN), so the card names
+    // the group without an avatar stack.
+    const secRes = await fetch(`${pbUrl}/api/divvy/groups/${encodeURIComponent(id)}/security`, { signal });
+    if (!secRes.ok) return null;
+    const info = await secRes.json();
+    if (!info.pin) return null;
+    name = info.name;
+  }
+  if (!name) return null;
 
   await wasmReady;
-  const resvg = new Resvg(buildCardSvg({ photo: { dataUri, caption: group.name } }), {
+  const resvg = new Resvg(buildCardSvg({ name, members }), {
     fitTo: { mode: 'width', value: 1200 },
     font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Space Mono' },
   });
