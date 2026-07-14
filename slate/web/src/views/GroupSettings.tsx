@@ -32,22 +32,39 @@ interface Props {
 }
 
 /**
- * Group settings: photos for the group, members, and parties; rename the
- * group; switch who "you" are on this device; link couples & households; and
- * configure currencies. Photos and party links apply immediately; the name
- * and currency fields go through Save. Changing the group currency rewrites
- * every expense's and payment's stored conversion at its own date — amounts
- * stay in their original currencies; only the group-level view moves.
+ * Group settings, split across two tabs behind a segmented control:
+ *
+ * - **Group** — identity (photo + name), currencies, receipt-scan coverage,
+ *   the join PIN, and leave/delete.
+ * - **People** — who "you" are on this device, the member roster, and couples
+ *   & households.
+ *
+ * Everything auto-saves the moment it changes — there is no Save button — and
+ * a brief "✓ Saved" badge in the header confirms each write. Changing the
+ * group currency still rewrites every expense's and payment's stored
+ * conversion at its own date: amounts stay in their original currencies; only
+ * the group-level view moves.
  */
 export function GroupSettings({ group, token, members, expenses, payments, me, onMeChange, onTokenRotated, onDone }: Props) {
-  // Local copies so photo/party edits show up without leaving the page; the
-  // caller reloads on the way out whenever anything was mutated.
+  // Local copies so edits show up without leaving the page; the caller reloads
+  // on the way out whenever anything was mutated.
   const [grp, setGrp] = useState(group);
   const [mems, setMems] = useState(members);
   const mutated = useRef(false);
   const confirm = useConfirm();
 
-  const oldCurrency = group.currency || 'USD';
+  const [tab, setTab] = useState<'group' | 'people'>('group');
+  // The "✓ Saved" badge: flashSaved() shows it, then fades it after ~1.5s. A
+  // ref holds the pending timer so back-to-back saves keep it up cleanly.
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+  const flashSaved = useCallback(() => {
+    setSaved(true);
+    clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 1500);
+  }, []);
+  useEffect(() => () => clearTimeout(savedTimer.current), []);
+
   const groupCurrency = grp.currency || 'USD';
 
   // Net position per member, so removal can be gated to settled members. Reads
@@ -58,24 +75,19 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
     payments.map(p => ({ from: p.from_member, to: p.to_member, cents: paymentGroupCents(p, groupCurrency) })),
   );
   const [name, setName] = useState(group.name);
-  const [currency, setCurrency] = useState(oldCurrency);
-  const [expenseCurrency, setExpenseCurrency] = useState(group.expense_currency || '');
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const nameTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const dirty =
-    name.trim() !== group.name ||
-    currency !== oldCurrency ||
-    (expenseCurrency || '') !== (group.expense_currency || '');
-
-  /** Immediate mutations (photos, parties) — outside the Save flow. */
+  /** Immediate mutations (photos, members, parties) — flash "✓ Saved" on success. */
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError('');
     try {
       await action();
       mutated.current = true;
+      flashSaved();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -99,6 +111,127 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
     run(async () => replaceMembers([await api.setMemberPhoto(m.id, await prepareAvatarImage(file), token)]));
   const clearMemberPhoto = (m: MemberRecord) =>
     run(async () => replaceMembers([await api.setMemberPhoto(m.id, null, token)]));
+
+  /** Persist a plain group field (name / expense_currency) and confirm it saved. */
+  async function saveGroup(patch: Partial<Pick<GroupRecord, 'name' | 'expense_currency'>>) {
+    setBusy(true);
+    setError('');
+    try {
+      setGrp(await api.updateGroup(grp.id, patch, token));
+      mutated.current = true;
+      flashSaved();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Commit the group name once the user pauses typing or leaves the field. */
+  function commitName(value: string) {
+    clearTimeout(nameTimer.current);
+    const trimmed = value.trim();
+    if (!trimmed) return setError('Give the group a name');
+    if (trimmed === grp.name) return;
+    saveGroup({ name: trimmed });
+  }
+  function onNameInput(value: string) {
+    setName(value);
+    setError('');
+    clearTimeout(nameTimer.current);
+    nameTimer.current = setTimeout(() => commitName(value), 700);
+  }
+
+  /** Change the default currency for new expenses — a cheap patch, saved at once. */
+  function changeExpenseCurrency(next: string) {
+    // '' means "same as group" — don't store a redundant copy.
+    saveGroup({ expense_currency: next === groupCurrency ? '' : next });
+  }
+
+  /**
+   * Switch the group's reporting currency. Confirms first (it rewrites every
+   * record's conversion), then updates the group and reconverts the ledger.
+   */
+  async function changeGroupCurrency(next: string) {
+    const from = groupCurrency;
+    if (next === from) return;
+    setError('');
+    if (
+      !(await confirm({
+        title: `Report balances in ${next} instead of ${from}?`,
+        message:
+          'Every expense keeps its original currency — converted amounts are ' +
+          'refreshed using each expense’s date.',
+        confirmLabel: 'Change currency',
+      }))
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await api.updateGroup(
+        grp.id,
+        // A default equal to the new group currency is redundant — clear it.
+        { currency: next, expense_currency: grp.expense_currency === next ? '' : grp.expense_currency },
+        token,
+      );
+      const failures = await reconvert(from, next);
+      setGrp(updated);
+      mutated.current = true;
+      if (failures.length > 0) {
+        setBusy(false);
+        setProgress('');
+        setError(
+          `No rate found for: ${failures.join(', ')}. Those were converted 1:1 — ` +
+            'open each one and set its converted amount by hand.',
+        );
+        return;
+      }
+      flashSaved();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  }
+
+  /**
+   * Rewrite currency/fx on every expense and payment for a new group
+   * currency. Records with an empty currency were implicitly in the old group
+   * currency — they get it stamped on explicitly so history stays truthful.
+   */
+  async function reconvert(oldCurrency: string, newCurrency: string): Promise<string[]> {
+    const [expenses, payments] = await Promise.all([
+      api.listExpenses(grp.id, token),
+      api.listPayments(grp.id, token),
+    ]);
+    const records = [
+      ...expenses.map(e => ({ kind: 'expense' as const, rec: e, label: e.description })),
+      ...payments.map(p => ({ kind: 'payment' as const, rec: p, label: `payment on ${p.date.slice(0, 10)}` })),
+    ];
+    const failures: string[] = [];
+    for (let i = 0; i < records.length; i++) {
+      const { kind, rec, label } = records[i]!;
+      setProgress(`Converting ${i + 1} of ${records.length}…`);
+      const recCurrency = rec.currency || oldCurrency;
+      let fx = 0;
+      if (recCurrency !== newCurrency) {
+        try {
+          const rate = await fetchRate(recCurrency, newCurrency, rec.date.slice(0, 10));
+          fx = convertMinor(rec.amount_cents, recCurrency, newCurrency, rate);
+        } catch {
+          fx = rec.amount_cents;
+          failures.push(label);
+        }
+      }
+      const patch = { currency: recCurrency, fx_cents: fx };
+      if (kind === 'expense') await api.patchExpense(rec.id, patch, token);
+      else await api.patchPayment(rec.id, patch, token);
+    }
+    setProgress('');
+    return failures;
+  }
 
   /** Just forget the group locally — the link still works if it resurfaces. */
   function removeFromDevice() {
@@ -131,233 +264,162 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
     }
   }
 
-  async function save() {
-    setError('');
-    if (!name.trim()) return setError('Give the group a name');
-    const changingCurrency = currency !== oldCurrency;
-    if (
-      changingCurrency &&
-      !(await confirm({
-        title: `Report balances in ${currency} instead of ${oldCurrency}?`,
-        message:
-          'Every expense keeps its original currency — converted amounts are ' +
-          'refreshed using each expense’s date.',
-        confirmLabel: 'Change currency',
-      }))
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.updateGroup(
-        group.id,
-        {
-          name: name.trim(),
-          currency,
-          // '' means "same as group" — don't store a redundant copy.
-          expense_currency: expenseCurrency === currency ? '' : expenseCurrency,
-        },
-        token,
-      );
-      const failures = changingCurrency ? await reconvert(currency) : [];
-      if (failures.length > 0) {
-        setBusy(false);
-        setProgress('');
-        setError(
-          `No rate found for: ${failures.join(', ')}. Those were converted 1:1 — ` +
-            'open each one and set its converted amount by hand.',
-        );
-        return;
-      }
-      onDone(true);
-    } catch (e) {
-      setError(String(e));
-      setBusy(false);
-      setProgress('');
-    }
-  }
-
-  /**
-   * Rewrite currency/fx on every expense and payment for a new group
-   * currency. Records with an empty currency were implicitly in the old group
-   * currency — they get it stamped on explicitly so history stays truthful.
-   */
-  async function reconvert(newCurrency: string): Promise<string[]> {
-    const [expenses, payments] = await Promise.all([
-      api.listExpenses(group.id, token),
-      api.listPayments(group.id, token),
-    ]);
-    const records = [
-      ...expenses.map(e => ({ kind: 'expense' as const, rec: e, label: e.description })),
-      ...payments.map(p => ({ kind: 'payment' as const, rec: p, label: `payment on ${p.date.slice(0, 10)}` })),
-    ];
-    const failures: string[] = [];
-    for (let i = 0; i < records.length; i++) {
-      const { kind, rec, label } = records[i]!;
-      setProgress(`Converting ${i + 1} of ${records.length}…`);
-      const recCurrency = rec.currency || oldCurrency;
-      let fx = 0;
-      if (recCurrency !== newCurrency) {
-        try {
-          const rate = await fetchRate(recCurrency, newCurrency, rec.date.slice(0, 10));
-          fx = convertMinor(rec.amount_cents, recCurrency, newCurrency, rate);
-        } catch {
-          fx = rec.amount_cents;
-          failures.push(label);
-        }
-      }
-      const patch = { currency: recCurrency, fx_cents: fx };
-      if (kind === 'expense') await api.patchExpense(rec.id, patch, token);
-      else await api.patchPayment(rec.id, patch, token);
-    }
-    setProgress('');
-    return failures;
-  }
-
   return (
     <div class="page">
       <header class="group-header">
         <button class="back" onClick={() => onDone(mutated.current)}>‹</button>
         <div class="group-title">
-          <h1>Group settings</h1>
+          <h1>Settings</h1>
+          <div class="subline settings-sub">{grp.name}</div>
         </div>
+        {saved && <span class="saved-tag">✓ Saved</span>}
       </header>
-      <div class="rhead subline">{grp.name}</div>
-      <hr class="rule" />
 
-      <div class="settings-photo">
-        <PhotoInput busy={busy} onPick={pickGroupPhoto}>
-          <Avatar
-            initials={collectiveInitials(grp.name)}
-            color={GROUP_AVATAR_COLOR}
-            size={72}
-            src={api.groupPhotoUrl(grp)}
-          />
-        </PhotoInput>
-        <div class="btn-row center">
-          <PhotoInput class="btn small" busy={busy} onPick={pickGroupPhoto}>
-            {grp.photo ? 'Change photo' : 'Add group photo'}
-          </PhotoInput>
-          {grp.photo && (
-            <button class="btn small" disabled={busy} onClick={clearGroupPhoto}>
-              Remove
-            </button>
-          )}
-        </div>
-      </div>
-      <hr class="rule" />
+      <nav class="tabs settings-tabs">
+        <button class={tab === 'group' ? 'on' : ''} onClick={() => setTab('group')}>
+          Group
+        </button>
+        <button class={tab === 'people' ? 'on' : ''} onClick={() => setTab('people')}>
+          People
+        </button>
+      </nav>
 
-      <div class="field">
-        <span>You are</span>
-        <div class="chip-row wrap">
-          {activeMembers(mems).map(m => (
-            <button
-              key={m.id}
-              class={`chip with-avatar ${m.id === me ? 'on' : ''}`}
-              onClick={() => onMeChange(m.id)}
-            >
-              <Avatar
-                initials={personInitial(m.name)}
-                color={colorForId(m.id)}
-                size={24}
-                src={api.memberPhotoUrl(m)}
+      {tab === 'group' ? (
+        <div class="stack">
+          <div>
+            <div class="settings-identity">
+              <PhotoInput busy={busy} onPick={pickGroupPhoto}>
+                <Avatar
+                  initials={collectiveInitials(name.trim() || grp.name)}
+                  color={GROUP_AVATAR_COLOR}
+                  size={64}
+                  src={api.groupPhotoUrl(grp)}
+                />
+              </PhotoInput>
+              <label class="field grow">
+                <span>Group name</span>
+                <input
+                  value={name}
+                  onInput={e => onNameInput((e.target as HTMLInputElement).value)}
+                  onBlur={e => commitName((e.target as HTMLInputElement).value)}
+                />
+              </label>
+            </div>
+            <p class="hint sans left" style="margin-top:8px;">
+              Tap the photo to change it. Name &amp; photo show for everyone in the group.
+            </p>
+            {grp.photo && (
+              <button class="btn small" style="margin-top:8px;" disabled={busy} onClick={clearGroupPhoto}>
+                Remove photo
+              </button>
+            )}
+          </div>
+          <hr class="rule" />
+
+          <div class="stack-sm">
+            <div class="seclbl left">Currency</div>
+            <label class="field">
+              <span>Group currency</span>
+              <CurrencySelect value={groupCurrency} onChange={changeGroupCurrency} />
+            </label>
+            <label class="field">
+              <span>New expenses default to</span>
+              <CurrencySelect
+                value={grp.expense_currency || ''}
+                onChange={changeExpenseCurrency}
+                emptyLabel={`Same as group (${groupCurrency})`}
               />
-              {m.name}
+            </label>
+            <p class="hint sans left">
+              Balances, settle-up &amp; totals report in your group currency. Log any
+              expense in another currency as you add it.
+            </p>
+            {progress && <p class="hint">{progress}</p>}
+          </div>
+          <hr class="rule" />
+
+          <ScanCreditsSection groupId={grp.id} token={token} onSaved={flashSaved} />
+          <hr class="rule" />
+
+          <SecuritySection
+            group={grp}
+            token={token}
+            onPinChanged={pinOn => {
+              mutated.current = true;
+              setGrp(g => ({ ...g, pin_on: pinOn }));
+              flashSaved();
+            }}
+            onTokenRotated={onTokenRotated}
+          />
+          <hr class="rule" />
+
+          <div class="stack-sm">
+            <div class="seclbl left muted">Leave or delete</div>
+            <button class="btn" disabled={busy} onClick={removeFromDevice}>
+              Remove from this device
             </button>
-          ))}
+            <p class="hint sans left">
+              Takes the group off your Home list. Nothing is deleted — opening the
+              link brings it back.
+            </p>
+            <button class="btn danger" disabled={busy} onClick={deleteGroup}>
+              Delete group for everyone
+            </button>
+            <p class="hint sans left">
+              Erases the group with all its expenses, payments, and receipts. The
+              link stops working for everybody. No undo.
+            </p>
+          </div>
         </div>
-        <p class="hint sans left" style="margin-top:4px;">
-          Just a default for “paid by” on this device — switch any time.
-        </p>
-      </div>
-      <hr class="rule" />
+      ) : (
+        <div class="stack">
+          <div class="stack-sm">
+            <div class="seclbl left">You on this device</div>
+            <p class="hint sans left">
+              Pick who you are so “paid by” defaults to you — switch any time.
+            </p>
+            <div class="chip-row wrap">
+              {activeMembers(mems).map(m => (
+                <button
+                  key={m.id}
+                  class={`chip with-avatar ${m.id === me ? 'on' : ''}`}
+                  onClick={() => onMeChange(m.id)}
+                >
+                  <Avatar
+                    initials={personInitial(m.name)}
+                    color={colorForId(m.id)}
+                    size={24}
+                    src={api.memberPhotoUrl(m)}
+                  />
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <hr class="rule" />
 
-      <label class="field">
-        <span>Group name</span>
-        <input value={name} onInput={e => setName((e.target as HTMLInputElement).value)} />
-      </label>
+          <MemberEditor
+            members={mems}
+            groupId={grp.id}
+            token={token}
+            me={me}
+            busy={busy}
+            groupCurrency={groupCurrency}
+            netOf={id => nets.get(id) ?? 0}
+            referenced={id => memberReferenced(id, expenses, payments)}
+            run={run}
+            replaceMembers={replaceMembers}
+            dropMember={dropMember}
+            appendMember={m => setMems(ms => [...ms, m])}
+            pickPhoto={pickMemberPhoto}
+            clearPhoto={clearMemberPhoto}
+          />
+          <hr class="rule" />
 
-      <label class="field" style="margin-top:10px;">
-        <span>Group currency</span>
-        <CurrencySelect value={currency} onChange={setCurrency} />
-        <p class="hint sans left" style="margin-top:4px;">
-          What balances, settle-up, and totals are reported in.
-        </p>
-      </label>
+          <PartyEditor members={mems} token={token} busy={busy} run={run} replaceMembers={replaceMembers} />
+        </div>
+      )}
 
-      <label class="field" style="margin-top:10px;">
-        <span>New expenses default to</span>
-        <CurrencySelect
-          value={expenseCurrency}
-          onChange={setExpenseCurrency}
-          emptyLabel={`Same as group (${currency})`}
-        />
-        <p class="hint sans left" style="margin-top:4px;">
-          Handy abroad: log expenses in EUR, settle in {currency}. Each expense
-          can still switch currency as you add it.
-        </p>
-      </label>
-
-      <button class="btn primary big" style="margin-top:14px;" onClick={save} disabled={busy || !dirty}>
-        {busy ? 'Saving…' : 'Save settings'}
-      </button>
-      <hr class="rule" />
-
-      <MemberEditor
-        members={mems}
-        groupId={grp.id}
-        token={token}
-        me={me}
-        busy={busy}
-        groupCurrency={groupCurrency}
-        netOf={id => nets.get(id) ?? 0}
-        referenced={id => memberReferenced(id, expenses, payments)}
-        run={run}
-        replaceMembers={replaceMembers}
-        dropMember={dropMember}
-        appendMember={m => setMems(ms => [...ms, m])}
-        pickPhoto={pickMemberPhoto}
-        clearPhoto={clearMemberPhoto}
-      />
-      <hr class="rule" />
-
-      <PartyEditor members={mems} token={token} busy={busy} run={run} replaceMembers={replaceMembers} />
-      <hr class="rule" />
-
-      <ScanCreditsSection groupId={grp.id} token={token} />
-      <hr class="rule" />
-
-      <SecuritySection
-        group={grp}
-        token={token}
-        onPinChanged={pinOn => {
-          mutated.current = true;
-          setGrp(g => ({ ...g, pin_on: pinOn }));
-        }}
-        onTokenRotated={onTokenRotated}
-      />
-      <hr class="rule" />
-
-      <div class="stack-sm">
-        <div class="seclbl left">Leave or delete</div>
-        <button class="btn" disabled={busy} onClick={removeFromDevice}>
-          Remove from this device
-        </button>
-        <p class="hint sans left">
-          Takes the group off your Home list. Nothing is deleted — opening the
-          link brings it back.
-        </p>
-        <button class="btn danger" disabled={busy} onClick={deleteGroup}>
-          Delete group for everyone
-        </button>
-        <p class="hint sans left">
-          Erases the group with all its expenses, payments, and receipts. The
-          link stops working for everybody. No undo.
-        </p>
-      </div>
-      <hr class="rule" />
-
-      {progress && <p class="hint">{progress}</p>}
       {error && <p class="error">{error}</p>}
 
       <div class="thanks">*** Thank you ***</div>
@@ -840,7 +902,7 @@ function PartyEditor({
  * cover scans here, lets the signed-in account start/stop covering the group
  * from its own balance, and opens the Slate Plus sheet to sign in or top up.
  */
-function ScanCreditsSection({ groupId, token }: { groupId: string; token: string }) {
+function ScanCreditsSection({ groupId, token, onSaved }: { groupId: string; token: string; onSaved: () => void }) {
   const user = useUser();
   const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
   /** my sponsorship row for this group, if I'm covering it */
@@ -879,6 +941,7 @@ function ScanCreditsSection({ groupId, token }: { groupId: string; token: string
       if (mine) await api.unsponsorGroup(mine.id, token);
       else await api.sponsorGroup(groupId, token);
       await reload();
+      onSaved();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -886,27 +949,44 @@ function ScanCreditsSection({ groupId, token }: { groupId: string; token: string
     }
   }
 
+  // Card headline + sub adapt to who (if anyone) is covering scans here.
+  const sponsorNames = allowance?.sponsors.map(s => s.name).join(', ');
+  const title = mine
+    ? 'You’re covering this group'
+    : sponsorNames
+      ? `Covered by ${sponsorNames}`
+      : 'Scans use each scanner’s own credits';
+  const sub = mine
+    ? `${user?.credits ?? 0} scans left · anyone here can scan`
+    : allowance && allowance.sponsors.length > 0
+      ? 'Anyone in the group can scan on their credits'
+      : 'Cover the group so everyone here can scan on yours';
+
   return (
     <div class="stack-sm">
       <div class="seclbl left">Receipt scans</div>
-      {allowance &&
-        (allowance.sponsors.length > 0 ? (
-          <p class="hint sans left">
-            Covered by {allowance.sponsors.map(s => `${s.name} (${s.credits} left)`).join(', ')} —
-            anyone in the group can scan receipts on their credits.
-          </p>
-        ) : (
-          <p class="hint sans left">
-            Scans currently use each scanner’s own credits. Cover the group and
-            everyone here can scan on yours — you can stop any time.
-          </p>
-        ))}
-      <button class="btn" disabled={busy} onClick={toggleCover}>
-        {mine ? 'Stop covering this group' : user ? 'Cover this group’s scans' : 'Sign in to cover this group'}
-      </button>
-      <button class="btn" onClick={() => setPlusOpen(true)}>
-        {user ? `Your scans: ${user.credits} · Top up` : 'Get scans'}
-      </button>
+      <div class="scan-cover-card">
+        <div class="scan-cover-head">
+          <span class="scan-cover-icon">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </span>
+          <span class="scan-cover-text">
+            <b>{title}</b>
+            <span class="scan-cover-sub">{sub}</span>
+          </span>
+        </div>
+        <div class="scan-cover-actions">
+          <button class="scan-cover-btn primary" onClick={() => setPlusOpen(true)}>
+            {user ? 'Top up' : 'Get scans'}
+          </button>
+          <button class="scan-cover-btn" disabled={busy} onClick={toggleCover}>
+            {mine ? 'Stop covering' : user ? 'Cover this group' : 'Sign in to cover'}
+          </button>
+        </div>
+      </div>
       {error && <p class="error">{error}</p>}
       <CreditsSheet open={plusOpen} onClose={() => setPlusOpen(false)} onChanged={reload} />
     </div>
@@ -936,6 +1016,9 @@ function SecuritySection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // With the PIN off, flipping the toggle "arms" it — revealing the digit
+  // field to set a code before the turn-on confirm fires.
+  const [arming, setArming] = useState(false);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -993,7 +1076,8 @@ function SecuritySection({
     ) {
       return;
     }
-    apply({ pin }, 'PIN is on. Invite people with the share button and tell them the PIN.');
+    await apply({ pin }, 'PIN is on. Invite people with the share button and tell them the PIN.');
+    setArming(false);
   }
 
   async function disablePin() {
@@ -1011,35 +1095,51 @@ function SecuritySection({
 
   return (
     <div class="stack-sm">
-      <div class="seclbl left">PIN &amp; recovery</div>
-      {!pinOn ? (
-        <>
+      <div class="seclbl left">Group PIN</div>
+      <div class="toggle-row">
+        <div class="toggle-row-text">
+          <div class="toggle-row-title">Require a PIN to join</div>
           <p class="hint sans left">
-            Right now anyone with the link is in. Add a 4–6 digit PIN and new
-            people must type it to join — the link alone stops being enough.
+            {pinOn
+              ? 'PIN is on — new people need it to join. Ten wrong tries lock joining until someone here unlocks it or changes the PIN.'
+              : 'Anyone with the link is in right now. Add a 4–6 digit PIN and new people must enter it to join.'}
           </p>
-          <div class="inline-add">
-            <input
-              class="pin-input"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              placeholder="4–6 digits"
-              value={pin}
-              onInput={e => setPin((e.target as HTMLInputElement).value.replace(/\D/g, ''))}
-            />
-            <button class="btn" disabled={busy || !pinValid} onClick={enablePin}>
-              Turn on PIN
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p class="hint sans left">
-            PIN is on — new people need it to join. Ten wrong tries lock
-            joining until someone here unlocks it or changes the PIN.
-          </p>
+        </div>
+        <button
+          class={`toggle ${pinOn ? 'on' : ''}`}
+          role="switch"
+          aria-checked={pinOn}
+          aria-label="Require a PIN to join"
+          disabled={busy}
+          onClick={() => {
+            if (pinOn) disablePin();
+            else setArming(a => !a);
+          }}
+        >
+          <span class="toggle-knob" />
+        </button>
+      </div>
+
+      {!pinOn && arming && (
+        <div class="inline-add pin-reveal">
+          <input
+            class="pin-input"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            placeholder="4–6 digits"
+            value={pin}
+            onInput={e => setPin((e.target as HTMLInputElement).value.replace(/\D/g, ''))}
+          />
+          <button class="btn" disabled={busy || !pinValid} onClick={enablePin}>
+            Turn on
+          </button>
+        </div>
+      )}
+
+      {pinOn && (
+        <div class="stack-sm pin-reveal">
           {info?.locked && (
             <>
               <p class="error left">Joining is locked — too many wrong PIN attempts.</p>
@@ -1067,11 +1167,8 @@ function SecuritySection({
               Change PIN
             </button>
           </div>
-          <button class="btn" disabled={busy} onClick={disablePin}>
-            Turn off the PIN
-          </button>
 
-          <label class="field" style="margin-top:10px;">
+          <label class="field">
             <span>Recovery email</span>
             <input
               type="email"
@@ -1096,7 +1193,7 @@ function SecuritySection({
             If the PIN is forgotten or joining gets locked, the join screen can
             email an access link to this address. Leave empty for none.
           </p>
-        </>
+        </div>
       )}
       {notice && <p class="hint sans left">{notice}</p>}
       {error && <p class="error">{error}</p>}

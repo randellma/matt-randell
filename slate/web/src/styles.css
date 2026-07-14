@@ -556,6 +556,67 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 .party-name { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; text-align: left; padding: 0; font-weight: 700; font-size: 0.88rem; color: var(--ink); }
 .party-sub { font-size: 0.72rem; color: var(--faint); font-weight: 400; }
 
+/* settings — tabbed, auto-saving */
+/* "✓ Saved" badge in the settings header, fading after a change lands */
+.saved-tag {
+  flex: none; align-self: center;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green);
+  border: 1.5px dashed var(--green); border-radius: 6px; padding: 5px 9px;
+  animation: pop 0.15s ease-out;
+}
+@keyframes pop { from { transform: scale(0.97); opacity: 0.4; } to { transform: none; opacity: 1; } }
+/* group name sits under the title in the settings header */
+.settings-sub { margin-top: 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* group identity — photo beside the name field */
+.settings-identity { display: flex; align-items: center; gap: 14px; }
+.settings-identity .photo-tap { box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.4); border-radius: 14px; }
+
+/* on/off switch — the receipt take on a toggle */
+.toggle-row { display: flex; align-items: flex-start; gap: 14px; }
+.toggle-row-text { flex: 1; min-width: 0; }
+.toggle-row-text .hint { margin-top: 3px; }
+.toggle-row-title { font-weight: 800; font-size: 0.95rem; color: var(--ink); }
+.toggle {
+  flex: none; position: relative; width: 48px; height: 28px; border-radius: 999px;
+  border: 1.8px solid var(--line); background: var(--paper2); transition: 0.15s;
+}
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--faint); transition: 0.15s;
+}
+.toggle.on { border-color: var(--accent); background: var(--accent); }
+.toggle.on .toggle-knob { left: 22px; background: #fff; }
+.toggle:disabled { opacity: 0.6; }
+/* the digit field / detail block revealed when the toggle flips */
+.pin-reveal { animation: pop 0.14s ease-out; }
+
+/* who's covering receipt scans — the design's boxed card */
+.scan-cover-card {
+  border: 1.8px solid var(--line); border-radius: 12px; padding: 14px;
+  display: flex; flex-direction: column; gap: 13px; background: var(--paper);
+}
+.scan-cover-head { display: flex; align-items: center; gap: 12px; }
+.scan-cover-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 9px;
+  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+}
+.scan-cover-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.scan-cover-text b { font-weight: 800; font-size: 0.95rem; color: var(--ink); }
+.scan-cover-sub { font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.62rem; letter-spacing: 0.03em; color: var(--faint); }
+.scan-cover-actions { display: flex; gap: 9px; }
+.scan-cover-btn {
+  flex: 1; padding: 11px; border-radius: 8px; cursor: pointer; transition: 0.12s;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.69rem; letter-spacing: 0.06em; text-transform: uppercase;
+  border: 1.8px dashed var(--line); background: var(--paper); color: var(--faint);
+}
+.scan-cover-btn:active { background: var(--paper2); }
+.scan-cover-btn.primary { border: 2px solid var(--accent); background: var(--accent); color: #fff; }
+.scan-cover-btn:disabled { opacity: 0.5; }
+
 /* fab */
 .fab {
   position: fixed; right: max(20px, calc(50% - 13.5rem + 20px)); bottom: calc(22px + env(safe-area-inset-bottom));
