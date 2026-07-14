@@ -25,6 +25,40 @@ export function useSwipeToClose(open: boolean, onClose: () => void): RefObject<H
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // Freeze the page behind the sheet. Without this the background is still a
+  // live scroll surface — `touch-action: manipulation` (set globally) lets the
+  // browser pan it in parallel with our drag, so the sheet and the page move at
+  // once. Position-fixing the body is the iOS-safe way to make the sheet the
+  // only thing that can move; we restore the exact scroll position on close.
+  useEffect(() => {
+    if (!open) return;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   useEffect(() => {
     const el = ref.current;
     if (!el || !open) return;
