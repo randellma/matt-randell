@@ -663,6 +663,90 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
   font-size: 0.69rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 2px;
 }
 
+/* receipt scanning — the scan-to-auto-fill card at the top of the expense
+   form: the one paid thing in the app, so it reads a notch richer than the
+   dashed paper around it */
+.receipt-section { display: flex; flex-direction: column; gap: 10px; margin-top: 11px; }
+.scan-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 13px 14px; border: 2px solid var(--accent); border-radius: 10px;
+  background: rgba(11, 122, 78, 0.07); transition: 0.12s;
+}
+.scan-card:active { background: rgba(11, 122, 78, 0.14); }
+.scan-card-icon {
+  flex: none; width: 44px; height: 44px; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.scan-card-main b { font-weight: 800; font-size: 1.02rem; color: var(--ink); }
+.scan-card-sub { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: var(--green); }
+.plus-chip {
+  flex: none; font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 5px 9px; border: 1.8px solid var(--accent); border-radius: 6px; color: var(--green);
+}
+.attach-strip {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; padding: 12px; border: 1.5px dashed var(--line); border-radius: 8px;
+  background: none; color: var(--faint); cursor: pointer; transition: 0.12s;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.69rem; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.attach-strip:active { background: var(--paper2); color: var(--ink); }
+.receipt-hint { margin-top: -2px; }
+/* post-scan confirmation — the same card, stamped done */
+.scan-done {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border: 2px solid var(--accent); border-radius: 10px;
+  background: rgba(11, 122, 78, 0.07);
+}
+.scan-done-check {
+  flex: none; width: 36px; height: 36px; border-radius: 8px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-done-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.scan-done-text b { font-weight: 800; font-size: 0.95rem; color: var(--ink); }
+.scan-done-sub { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; color: var(--green); }
+
+/* the Slate Plus sheet — sign in and scan packs */
+.plus-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--green); margin-bottom: 4px;
+}
+.credits-balance { display: flex; align-items: flex-end; padding: 2px 0; }
+.credits-balance b { font-size: 1.15rem; }
+.pack-list { display: flex; flex-direction: column; gap: 9px; }
+.pack-row {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 13px 14px; border: 1.8px dashed var(--line); border-radius: 10px;
+  background: var(--paper); transition: 0.12s;
+}
+.pack-row.on { border: 2px solid var(--accent); background: rgba(11, 122, 78, 0.07); }
+.pack-radio {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--line); background: var(--paper);
+}
+.pack-row.on .pack-radio { border-color: var(--accent); box-shadow: inset 0 0 0 4.5px var(--paper); background: var(--accent); }
+.pack-label { font-weight: 800; font-size: 0.98rem; color: var(--ink); }
+.pack-badge {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 3px 7px; border: 1.5px solid var(--accent); border-radius: 5px; color: var(--green);
+}
+.pack-price { margin-left: auto; font-weight: 700; font-size: 0.95rem; color: var(--ink); }
+.beta-note { text-align: left; }
+.credits-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem; }
+.linkish {
+  font-family: 'Space Mono', ui-monospace, monospace; font-weight: 700; font-size: 0.69rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.linkish:active { color: var(--ink); }
+
 /* confirm/alert dialogs — a centered receipt card, in place of OS native modals */
 .dialog-overlay {
   position: fixed; inset: 0; z-index: 40;

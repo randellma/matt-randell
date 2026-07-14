@@ -29,8 +29,20 @@ How an Expense's amount divides among Members. One of four modes: **Evenly** (pa
 _Avoid_: Breakdown, allocation, division
 
 **Receipt**:
-A photo or PDF of an itemized bill (PDFs cover emailed receipts — rides, hotels, flights, stays), parsed by OCR into line Items plus tax/tip/total. Exists so an Itemized Split can be assembled by tapping rather than typing.
-_Avoid_: Scan, upload
+A photo or PDF of an itemized bill (PDFs cover emailed receipts — rides, hotels, flights, stays), parsed by OCR into line Items plus tax/tip/total. Exists so an Itemized Split can be assembled by tapping rather than typing. Parsing one is a Scan and spends a Scan Credit; attaching the photo without parsing is free.
+_Avoid_: Scan (for the artifact — a Scan is the paid act of parsing), upload
+
+**Account**:
+An optional sign-in (email + 6-digit emailed code, no password) that exists solely to hold Scan Credits — never required for joining, splitting, or attaching photos (ADR-0004 amending ADR-0001). Identified to Groups only by its display name.
+_Avoid_: User (in code the collection is `users`, but in prose an account is not a Member), login, profile
+
+**Scan Credit**:
+The metered unit of receipt scanning: one successful parse spends one credit. Lives on an Account as a balance backed by an append-only ledger (`credit_events`); arrives via a welcome grant (5 on first sign-in) or a purchased pack (free during beta, real payments later). Failed parses cost nothing.
+_Avoid_: Token, coin, quota
+
+**Sponsorship**:
+An Account's standing offer to let one Group scan on its credits ("cover this group"). A draw-permission flag, not a transfer — the Scan Credit leaves the sponsor's balance at scan time, so ending a Sponsorship never strands credits. When a scanner has no credits of their own, the sponsor with the largest balance is charged.
+_Avoid_: Subscription, pool, allowance (the *scan-allowance* endpoint answers "can a scan run here", not this)
 
 **Item**:
 One purchasable line on a Receipt (or added by hand). Assigned to one or more Members; an Item with several assignees is shared equally among them. Discounts are Items with negative amounts.
@@ -75,6 +87,8 @@ _Avoid_: Exchange (as a noun), rate (as the stored thing — the amount is store
 - Balances, settle-up, and Payments are Group-currency only; an Expense's own currency never leaks into the ledger.
 - A Payment between two Members of the same Party changes their internal breakdown but not the Party's group-level Balance.
 - OCR output is a draft: an Itemized Split is never saved until a human has assigned every Item.
+- Every Scan Credit movement is a `credit_events` row; the balance on the Account is always the ledger's sum. Only successful Scans deduct, and only server hooks write either.
+- An Account gates nothing but Scans: every Group feature works signed-out, and a Member without an Account can still Scan wherever a Sponsorship covers them.
 
 ## Example dialogue
 

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { api, navigate } from '../app';
-import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, SecurityInfo } from '../api';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, ScanAllowance, SecurityInfo, SponsorshipRecord } from '../api';
 import { convertMinor, formatMoney } from '../lib/currency';
 import { fetchRate } from '../lib/fx';
 import { computeNets, expenseForBalance, paymentGroupCents, suggestSettlements } from '../lib/balances';
@@ -12,6 +12,8 @@ import { groupParties, partyDisplayName } from '../lib/party';
 import { forgetGroup, newToken } from '../identity';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
+import { CreditsSheet } from '../components/CreditsSheet';
+import { useUser } from '../account';
 import { useAlert, useConfirm } from '../components/ConfirmDialog';
 
 interface Props {
@@ -320,6 +322,9 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
       <hr class="rule" />
 
       <PartyEditor members={mems} token={token} busy={busy} run={run} replaceMembers={replaceMembers} />
+      <hr class="rule" />
+
+      <ScanCreditsSection groupId={grp.id} token={token} />
       <hr class="rule" />
 
       <SecuritySection
@@ -826,6 +831,84 @@ function PartyEditor({
           onClose={() => setRenaming(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Receipt scans for this group (ADR-0004). Shows whose credits currently
+ * cover scans here, lets the signed-in account start/stop covering the group
+ * from its own balance, and opens the Slate Plus sheet to sign in or top up.
+ */
+function ScanCreditsSection({ groupId, token }: { groupId: string; token: string }) {
+  const user = useUser();
+  const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
+  /** my sponsorship row for this group, if I'm covering it */
+  const [mine, setMine] = useState<SponsorshipRecord | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [error, setError] = useState('');
+
+  const reload = useCallback(async () => {
+    try {
+      // Balance may have moved since the last authStore refresh (scans spend
+      // credits without touching it) — the button label reads user.credits.
+      api.refreshUser();
+      const [a, rows] = await Promise.all([
+        api.scanAllowance(groupId, token),
+        api.listSponsorships(groupId, token),
+      ]);
+      setAllowance(a);
+      setMine(user ? (rows.find(r => r.user === user.id) ?? null) : null);
+    } catch {
+      /* section renders without the coverage line — the buttons still work */
+    }
+  }, [groupId, token, user?.id]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  async function toggleCover() {
+    if (!user) {
+      setPlusOpen(true);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      if (mine) await api.unsponsorGroup(mine.id, token);
+      else await api.sponsorGroup(groupId, token);
+      await reload();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div class="stack-sm">
+      <div class="seclbl left">Receipt scans</div>
+      {allowance &&
+        (allowance.sponsors.length > 0 ? (
+          <p class="hint sans left">
+            Covered by {allowance.sponsors.map(s => `${s.name} (${s.credits} left)`).join(', ')} —
+            anyone in the group can scan receipts on their credits.
+          </p>
+        ) : (
+          <p class="hint sans left">
+            Scans currently use each scanner’s own credits. Cover the group and
+            everyone here can scan on yours — you can stop any time.
+          </p>
+        ))}
+      <button class="btn" disabled={busy} onClick={toggleCover}>
+        {mine ? 'Stop covering this group' : user ? 'Cover this group’s scans' : 'Sign in to cover this group'}
+      </button>
+      <button class="btn" onClick={() => setPlusOpen(true)}>
+        {user ? `Your scans: ${user.credits} · Top up` : 'Get scans'}
+      </button>
+      {error && <p class="error">{error}</p>}
+      <CreditsSheet open={plusOpen} onClose={() => setPlusOpen(false)} onChanged={reload} />
     </div>
   );
 }

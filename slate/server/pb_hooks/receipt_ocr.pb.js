@@ -61,4 +61,20 @@ onRecordAfterCreateSuccess((e) => {
   }
 
   e.app.save(receipt);
+
+  // Charge only successful scans: credit_user was resolved by the create
+  // gate (credits.pb.js); a failed parse costs nothing.
+  if (receipt.getString("status") === "done" && receipt.getString("credit_user") !== "") {
+    try {
+      const accounts = require(`${__hooks}/accounts_utils.js`);
+      const payer = e.app.findRecordById("users", receipt.getString("credit_user"));
+      accounts.addCredits(e.app, payer, -1, "scan", {
+        group: receipt.getString("group"),
+        receipt: receipt.id,
+      });
+    } catch (err) {
+      // Never fail the scan over bookkeeping — log and move on.
+      console.error("slate scan credit deduction failed:", err);
+    }
+  }
 }, "receipts");

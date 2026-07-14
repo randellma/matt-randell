@@ -110,6 +110,47 @@ export interface ReceiptRecord {
   error: string;
 }
 
+/** The signed-in account — exists only to hold scan credits (ADR-0004). */
+export interface UserRecord {
+  id: string;
+  email: string;
+  /** display name shown where this account's credits cover a group; '' = masked email */
+  name: string;
+  /** live scan-credit balance */
+  credits: number;
+}
+
+/**
+ * What a scan in a group would cost and whose balance it would charge —
+ * the expense form's scan card renders straight from this.
+ */
+export interface ScanAllowance {
+  signed_in: boolean;
+  self_credits: number;
+  /** who a scan would charge: you, a sponsor's balance, or nobody (blocked) */
+  source: 'self' | 'sponsor' | null;
+  sponsor_name: string;
+  /** everyone covering this group, for the settings screen */
+  sponsors: { user: string; name: string; credits: number }[];
+}
+
+/** "This group may draw from my credits" — one row per sponsor per group. */
+export interface SponsorshipRecord {
+  id: string;
+  group: string;
+  user: string;
+}
+
+/**
+ * The purchasable packs, mirrored from the server (accounts_utils.js PACKS) —
+ * the purchase route only honors ids it knows, so drift can't undercharge.
+ */
+export const CREDIT_PACKS = [
+  { id: 'p10', credits: 10, priceCents: 299, label: '10 scans', best: false },
+  { id: 'p30', credits: 30, priceCents: 699, label: '30 scans', best: true },
+] as const;
+export type CreditPackId = (typeof CREDIT_PACKS)[number]['id'];
+
 /** Whether the receipt's stored file is a PDF (vs a photo). */
 export function receiptIsPdf(r: ReceiptRecord): boolean {
   return r.image.toLowerCase().endsWith('.pdf');
@@ -382,6 +423,105 @@ export class DivvyApi {
   /** Ask the server to email the group's access link to its recovery address. */
   async requestRecovery(groupId: string): Promise<{ sent: boolean; to: string }> {
     return this.pb.send(`/api/divvy/groups/${groupId}/recover`, { method: 'POST', body: {} });
+  }
+
+  // ── accounts & scan credits ────────────────────────────────────────────
+  // Group access never needs an account; these exist only for scan credits.
+  // The PocketBase SDK persists the auth token in localStorage and attaches
+  // it as an Authorization header alongside the usual ?t=.
+
+  /** The signed-in account, if any. */
+  get user(): UserRecord | null {
+    const r = this.pb.authStore.record;
+    if (!this.pb.authStore.isValid || !r) return null;
+    return {
+      id: r.id,
+      email: (r as { email?: string }).email ?? '',
+      name: (r as { name?: string }).name ?? '',
+      credits: (r as { credits?: number }).credits ?? 0,
+    };
+  }
+
+  /** Subscribe to sign-in/out and balance changes; returns an unsubscribe. */
+  onAuthChange(cb: (user: UserRecord | null) => void): () => void {
+    return this.pb.authStore.onChange(() => cb(this.user));
+  }
+
+  /** Email a 6-digit sign-in code; creates the account on first contact. */
+  async requestAuthCode(email: string): Promise<void> {
+    await this.pb.send('/api/divvy/auth/request-code', { method: 'POST', body: { email } });
+  }
+
+  /** Trade the emailed code for a session. First sign-in grants welcome credits. */
+  async verifyAuthCode(email: string, code: string): Promise<UserRecord> {
+    const res: { token: string } = await this.pb.send('/api/divvy/auth/verify', {
+      method: 'POST',
+      body: { email, code },
+    });
+    this.pb.authStore.save(res.token);
+    // Pull the real record through the collection API so authStore holds a
+    // refreshable model (credits and all), not just our route's summary.
+    await this.pb.collection('users').authRefresh();
+    return this.user!;
+  }
+
+  signOut(): void {
+    this.pb.authStore.clear();
+  }
+
+  /** Re-fetch the signed-in record (fresh credits). Clears a dead session. */
+  async refreshUser(): Promise<UserRecord | null> {
+    if (!this.pb.authStore.isValid) return null;
+    try {
+      await this.pb.collection('users').authRefresh();
+    } catch {
+      this.pb.authStore.clear();
+    }
+    return this.user;
+  }
+
+  /** Set the display name shown where this account's credits cover a group. */
+  async setUserName(name: string): Promise<void> {
+    const id = this.pb.authStore.record?.id;
+    if (!id) return;
+    const rec = await this.pb.collection('users').update(id, { name });
+    this.pb.authStore.save(this.pb.authStore.token, rec);
+  }
+
+  /** Buy a pack. Beta: granted instantly, no payment taken. */
+  async purchasePack(pack: CreditPackId): Promise<{ granted: number; credits: number }> {
+    const res: { granted: number; credits: number } = await this.pb.send('/api/divvy/credits/purchase', {
+      method: 'POST',
+      body: { pack },
+    });
+    await this.refreshUser();
+    return res;
+  }
+
+  /** Whether (and on whose balance) a scan in this group can run right now. */
+  async scanAllowance(groupId: string, t: string): Promise<ScanAllowance> {
+    return this.pb.send(`/api/divvy/groups/${groupId}/scan-allowance`, {
+      method: 'GET',
+      query: { t },
+    });
+  }
+
+  async listSponsorships(groupId: string, t: string): Promise<SponsorshipRecord[]> {
+    return this.pb.collection('sponsorships').getFullList({
+      filter: this.pb.filter('group = {:g}', { g: groupId }),
+      query: { t },
+    });
+  }
+
+  /** Start covering a group's scans from the signed-in account's credits. */
+  async sponsorGroup(groupId: string, t: string): Promise<SponsorshipRecord> {
+    return this.pb
+      .collection('sponsorships')
+      .create({ group: groupId, user: this.pb.authStore.record?.id }, { query: { t } });
+  }
+
+  async unsponsorGroup(sponsorshipId: string, t: string): Promise<void> {
+    await this.pb.collection('sponsorships').delete(sponsorshipId, { query: { t } });
   }
 
   async waitForReceipt(id: string, t: string, timeoutMs = 120000): Promise<ReceiptRecord> {

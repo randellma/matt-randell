@@ -61,7 +61,8 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
    rename, or the next server build fails on a missing path.)*
 2. Add a persistent volume mounted at `/pb/pb_data`.
 3. Set env vars: `ANTHROPIC_API_KEY` (required for receipt OCR);
-   `RESEND_API_KEY` (required for PIN-recovery emails — see below); optionally
+   `RESEND_API_KEY` (required for PIN-recovery and sign-in-code emails — see
+   below); optionally
    `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
    (default `Slate <slate@mattrandell.com>`), and `DIVVY_APP_URL` (default
    `https://slate.mattrandell.com`). The `DIVVY_*` env var **names** are kept
@@ -75,6 +76,27 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
 5. On first boot, migrations auto-apply. Create the superuser for the admin UI
    with `./pocketbase superuser upsert <email> <pass>` inside the container
    (only needed for admin access — the app itself never uses it).
+
+## Accounts & scan credits (beta)
+
+Receipt scanning is metered by **scan credits** on an optional account —
+the only thing in Slate that has one (see
+[ADR-0004](docs/adr/0004-scan-credits-optional-accounts.md)). Sign-in is a
+6-digit code emailed via Resend (`/api/divvy/auth/request-code` + `/verify`);
+no passwords. First sign-in grants 5 credits; packs (10/$2.99, 30/$6.99) are
+recorded through `/api/divvy/credits/purchase` and, while in beta, granted
+free — the `purchases` row carries `status`/`provider`/`provider_ref` so a
+real payment provider can slot in later without schema changes.
+
+A scan (receipt created with `status: pending`) charges the scanner's own
+balance first, else a **sponsor**: any account that toggled "cover this
+group's scans" (Group settings). Sponsoring is a draw permission, not a
+transfer; the sponsor with the largest balance is charged. No credits
+anywhere → the create is refused with HTTP 402 and the PWA opens the top-up
+sheet. Credits are only spent on *successful* parses, and every movement is a
+`credit_events` ledger row behind the `users.credits` balance.
+
+Attaching a receipt photo without scanning stays free and account-less.
 
 ## How access works
 
@@ -94,10 +116,11 @@ recovery email address can be set per group — the join screen's "forgot the
 PIN?" button emails that address the group's access link. See
 [ADR-0003](docs/adr/0003-optional-group-pin.md).
 
-## Recovery emails (Resend)
+## Recovery & sign-in emails (Resend)
 
-Recovery emails go out through [Resend](https://resend.com)'s HTTP API from a
-PocketBase hook — no SMTP setup. One-time setup:
+Recovery emails and account sign-in codes go out through
+[Resend](https://resend.com)'s HTTP API from PocketBase hooks — no SMTP
+setup. One-time setup:
 
 1. In the Resend dashboard, verify the sending domain (`mattrandell.com`) —
    already done if another app sends from it — and create an API key

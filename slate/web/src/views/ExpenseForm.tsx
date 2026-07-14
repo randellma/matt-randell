@@ -1,8 +1,8 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api } from '../app';
 import { receiptIsPdf } from '../api';
-import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, ReceiptRecord, SplitData } from '../api';
+import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, ReceiptRecord, ScanAllowance, SplitData } from '../api';
 import { allocate, allocateEven } from '../lib/money';
 import {
   allCurrencies,
@@ -24,6 +24,7 @@ import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 import { PdfPages, PdfThumb } from '../components/PdfViewer';
 import { useConfirm } from '../components/ConfirmDialog';
+import { CreditsSheet } from '../components/CreditsSheet';
 
 interface Props {
   group: GroupRecord;
@@ -120,6 +121,32 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // The scan card's state: whether a scan can run here and whose credits it
+  // would use. Refreshed after anything that could change it (sign-in,
+  // top-up, a scan spending a credit).
+  const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+  // Set when a scan succeeded in this session — drives the "auto-filled" card.
+  const [scanResult, setScanResult] = useState<{ merchant: string; items: number } | null>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
+  const reloadAllowance = useCallback(() => {
+    api.scanAllowance(group.id, token).then(setAllowance, () => setAllowance(null));
+  }, [group.id, token]);
+  useEffect(() => reloadAllowance(), [reloadAllowance]);
+
+  /** The scan entry point, wherever it's tapped: gate first, then pick a file. */
+  function beginScan() {
+    // No way to pay for the scan — the sheet sorts that out (sign in / top
+    // up). With the allowance unknown (still loading, or the request failed)
+    // let the attempt through; the server is the real gate.
+    if (allowance && allowance.source === null) {
+      setPlusOpen(true);
+      return;
+    }
+    scanInputRef.current?.click();
+  }
+
   // Foreign-currency conversion. The converted amount (in group currency) is
   // what balances use; it follows the fetched rate until hand-edited, same
   // pattern as the payer amounts below.
@@ -213,6 +240,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
     setReceiptId('');
     setReceiptRec(null);
     setReceiptGone(false);
+    setScanResult(null);
   }
 
   useEffect(() => {
@@ -378,8 +406,22 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       setAmountText((total / 100).toFixed(2));
       if (!description && parsed.merchant) setDescription(parsed.merchant);
       if (parsed.currency && allCurrencies().includes(parsed.currency)) changeCurrency(parsed.currency);
+      // The whole point of scanning: land the user on the itemized split with
+      // everything filled in, one credit spent.
+      setMode('items');
+      setScanResult({ merchant: parsed.merchant, items: parsed.items.length });
+      // The scan spent a credit — refresh both the group allowance and the
+      // signed-in balance everything else displays.
+      reloadAllowance();
+      api.refreshUser();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      // Out of credits (or beaten to the last one) — the Plus sheet is the answer.
+      if ((e as { status?: number }).status === 402) {
+        reloadAllowance();
+        setPlusOpen(true);
+      } else {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setScanState('idle');
     }
@@ -493,6 +535,119 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       <hr class="rule" />
 
       <div>
+        <div class="seclbl left">Receipt</div>
+        <input
+          ref={scanInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          hidden
+          onChange={e => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) scanReceipt(file);
+            (e.target as HTMLInputElement).value = '';
+          }}
+        />
+        <div class="receipt-section">
+          {receiptId ? (
+            <>
+              {scanResult && (
+                <div class="scan-done">
+                  <span class="scan-done-check">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </span>
+                  <span class="scan-done-text">
+                    <b>Auto-filled from your receipt</b>
+                    <span class="scan-done-sub num">
+                      {[
+                        scanResult.merchant,
+                        `total, date & ${scanResult.items} item${scanResult.items === 1 ? '' : 's'}`,
+                        '1 scan used',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </span>
+                </div>
+              )}
+              <div class="receipt-row">
+                {receiptRec ? (
+                  <>
+                    <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
+                      {receiptIsPdf(receiptRec) ? (
+                        // PocketBase can't thumbnail a PDF — pdf.js draws page 1,
+                        // with a paper-doc icon standing in until (or unless) it does.
+                        <PdfThumb
+                          url={api.receiptImageUrl(receiptRec)!}
+                          height={56}
+                          fallback={
+                            <span class="pdf-fallback">
+                              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              PDF
+                            </span>
+                          }
+                        />
+                      ) : (
+                        <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
+                      )}
+                    </button>
+                    <span class="receipt-note">Tap to view</span>
+                  </>
+                ) : (
+                  <span class="receipt-note">{receiptGone ? 'Receipt image unavailable' : 'Loading receipt…'}</span>
+                )}
+                <button class="pct-remove" title="Remove receipt" onClick={detachReceipt}>×</button>
+              </div>
+            </>
+          ) : scanState === 'working' ? (
+            <div class="scan-status"><div class="spinner" /> Reading your receipt…</div>
+          ) : attachState === 'working' ? (
+            <div class="scan-status"><div class="spinner" /> Uploading…</div>
+          ) : (
+            <>
+              <button class="scan-card" onClick={beginScan}>
+                <span class="scan-card-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </span>
+                <span class="scan-card-main">
+                  <b>Scan to auto-fill</b>
+                  <span class="scan-card-sub num">{scanSubline(allowance)}</span>
+                </span>
+                <span class="plus-chip">Plus</span>
+              </button>
+              <label class="attach-strip">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+                Attach a photo for records
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  hidden
+                  onChange={e => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) attachReceipt(file);
+                    (e.target as HTMLInputElement).value = '';
+                  }}
+                />
+              </label>
+              <p class="hint sans receipt-hint">
+                Scanning fills in the details for you. Attaching just keeps a photo with the expense.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+      <hr class="rule" />
+
+      <div>
         <label class="field">
           <span>Description</span>
           <input
@@ -568,61 +723,6 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
             <PayerSum payerIds={payerIds} payerAmounts={payerAmounts} amountCents={amountCents} currency={currency} />
           </div>
         )}
-        <div class="field" style="margin-top:14px;">
-          <span>Receipt</span>
-          {receiptId ? (
-            <div class="receipt-row">
-              {receiptRec ? (
-                <>
-                  <button class="receipt-thumb" title="View receipt" onClick={() => setReceiptOpen(true)}>
-                    {receiptIsPdf(receiptRec) ? (
-                      // PocketBase can't thumbnail a PDF — pdf.js draws page 1,
-                      // with a paper-doc icon standing in until (or unless) it does.
-                      <PdfThumb
-                        url={api.receiptImageUrl(receiptRec)!}
-                        height={56}
-                        fallback={
-                          <span class="pdf-fallback">
-                            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                            </svg>
-                            PDF
-                          </span>
-                        }
-                      />
-                    ) : (
-                      <img src={api.receiptImageUrl(receiptRec, '0x200')} alt="Receipt" />
-                    )}
-                  </button>
-                  <span class="receipt-note">Tap to view</span>
-                </>
-              ) : (
-                <span class="receipt-note">{receiptGone ? 'Receipt image unavailable' : 'Loading receipt…'}</span>
-              )}
-              <button class="pct-remove" title="Remove receipt" onClick={detachReceipt}>×</button>
-            </div>
-          ) : attachState === 'working' ? (
-            <div class="scan-status"><div class="spinner" /> Uploading…</div>
-          ) : (
-            <label class="btn small attach-btn">
-              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
-              Attach photo or PDF
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                hidden
-                onChange={e => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) attachReceipt(file);
-                  (e.target as HTMLInputElement).value = '';
-                }}
-              />
-            </label>
-          )}
-        </div>
       </div>
       <hr class="rule" />
 
@@ -726,7 +826,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
               amountCents={amountCents}
               currency={currency}
               scanState={scanState}
-              onScan={scanReceipt}
+              onScanClick={beginScan}
             />
           </div>
         )}
@@ -772,6 +872,13 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
       </button>
       <hr class="rule" style="margin-top:8px;" />
       <div class="thanks">*** Thank you ***</div>
+
+      <CreditsSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        reason={allowance?.signed_in ? 'out-of-scans' : 'signin'}
+        onChanged={reloadAllowance}
+      />
 
       {receiptOpen && receiptRec && (
         <div class="lightbox" onClick={() => setReceiptOpen(false)}>
@@ -951,6 +1058,15 @@ function PercentSum({ percents, members }: { percents: Record<string, string>; m
   );
 }
 
+/** The scan card's one-line pitch: exactly what tapping it will do or cost. */
+function scanSubline(a: ScanAllowance | null): string {
+  if (!a) return 'Total, date & items from a photo';
+  if (a.source === 'self') return `Uses 1 of your ${a.self_credits} scan${a.self_credits === 1 ? '' : 's'}`;
+  if (a.source === 'sponsor') return `Covered by ${a.sponsor_name}`;
+  if (!a.signed_in) return 'Sign in · 5 free scans to start';
+  return 'Out of scans — tap to top up';
+}
+
 function ItemEditor({
   items,
   setItems,
@@ -958,7 +1074,7 @@ function ItemEditor({
   amountCents,
   currency,
   scanState,
-  onScan,
+  onScanClick,
 }: {
   items: AssignedItem[];
   setItems: (updater: AssignedItem[] | ((prev: AssignedItem[]) => AssignedItem[])) => void;
@@ -966,7 +1082,7 @@ function ItemEditor({
   amountCents: number | null;
   currency: string;
   scanState: 'idle' | 'working';
-  onScan: (file: File) => void;
+  onScanClick: () => void;
 }) {
   const [draftLabel, setDraftLabel] = useState('');
   const [draftPrice, setDraftPrice] = useState('');
@@ -1010,19 +1126,9 @@ function ItemEditor({
           <div class="spinner" /> Reading receipt…
         </div>
       ) : (
-        <label class="btn scan-btn">
+        <button class="btn scan-btn" onClick={onScanClick}>
           {items.length ? 'Rescan receipt' : 'Scan receipt'}
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            hidden
-            onChange={e => {
-              const file = (e.target as HTMLInputElement).files?.[0];
-              if (file) onScan(file);
-              (e.target as HTMLInputElement).value = '';
-            }}
-          />
-        </label>
+        </button>
       )}
 
       {items.length > 0 && (

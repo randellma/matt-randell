@@ -6,6 +6,8 @@ import { collectiveInitials, GROUP_AVATAR_COLOR } from '../lib/avatar';
 import { activeMembers } from '../lib/member';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
+import { CreditsSheet } from '../components/CreditsSheet';
+import { useUser } from '../account';
 import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
 
 interface GroupSummary {
@@ -66,8 +68,15 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
 export function Home() {
   const [creating, setCreating] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const user = useUser();
   const groups = listJoinedGroups();
   const summaries = useGroupSummaries(groups);
+  // The scans row shows the live balance; scans spend credits without
+  // touching the cached authStore record, so refresh it on the way in.
+  useEffect(() => {
+    api.refreshUser();
+  }, []);
 
   return (
     <div class="page">
@@ -137,7 +146,16 @@ export function Home() {
       )}
 
       <hr class="rule" style="margin-top:6px;" />
+      <button class="invite-btn" onClick={() => setPlusOpen(true)}>
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+        {user ? `Receipt scans · ${user.credits} left` : 'Receipt scans · sign in'}
+      </button>
       <div class="thanks">*** Thank you ***</div>
+
+      <CreditsSheet open={plusOpen} onClose={() => setPlusOpen(false)} />
     </div>
   );
 }
