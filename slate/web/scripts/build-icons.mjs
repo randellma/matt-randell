@@ -29,10 +29,17 @@ const appIcon = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http
       <stop offset="0%" stop-color="${SLATE}"/>
       <stop offset="100%" stop-color="${SLATE2}"/>
     </radialGradient>
+    <!-- soft chalk halo behind the S (the design's text-shadow glow) -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
   </defs>
   <rect width="512" height="512" fill="url(#board)"/>
 
-  <!-- chalk "S" wordmark initial, the hero mark -->
+  <!-- chalk "S" wordmark initial, the hero mark. Drawn twice: a blurred
+       copy underneath for the glow, then the crisp letter on top. -->
+  <text x="256" y="322" text-anchor="middle" font-family="Space Mono" font-weight="700"
+        font-size="320" fill="${CHALK}" letter-spacing="0" opacity="0.4" filter="url(#glow)">S</text>
   <text x="256" y="322" text-anchor="middle" font-family="Space Mono" font-weight="700"
         font-size="320" fill="${CHALK}" letter-spacing="0">S</text>
 
