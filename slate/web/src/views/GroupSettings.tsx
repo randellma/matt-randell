@@ -12,6 +12,7 @@ import { groupParties, partyDisplayName } from '../lib/party';
 import { forgetGroup, newToken } from '../identity';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
+import { useAlert, useConfirm } from '../components/ConfirmDialog';
 
 interface Props {
   group: GroupRecord;
@@ -42,6 +43,7 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
   const [grp, setGrp] = useState(group);
   const [mems, setMems] = useState(members);
   const mutated = useRef(false);
+  const confirm = useConfirm();
 
   const oldCurrency = group.currency || 'USD';
   const groupCurrency = grp.currency || 'USD';
@@ -104,11 +106,14 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
 
   async function deleteGroup() {
     if (
-      !confirm(
-        `Delete "${grp.name}" for everyone?\n\n` +
+      !(await confirm({
+        title: `Delete “${grp.name}” for everyone?`,
+        message:
           'All expenses, payments, and receipts go with it, and the link ' +
-          "stops working for everybody. This can't be undone.",
-      )
+          'stops working for everybody. This can’t be undone.',
+        confirmLabel: 'Delete',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -130,11 +135,13 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
     const changingCurrency = currency !== oldCurrency;
     if (
       changingCurrency &&
-      !confirm(
-        `Report balances in ${currency} instead of ${oldCurrency}?\n\n` +
+      !(await confirm({
+        title: `Report balances in ${currency} instead of ${oldCurrency}?`,
+        message:
           'Every expense keeps its original currency — converted amounts are ' +
-          "refreshed using each expense's date.",
-      )
+          'refreshed using each expense’s date.',
+        confirmLabel: 'Change currency',
+      }))
     ) {
       return;
     }
@@ -425,6 +432,8 @@ function MemberEditor({
 }) {
   const [newName, setNewName] = useState('');
   const [renaming, setRenaming] = useState<MemberRecord | null>(null);
+  const confirm = useConfirm();
+  const alert = useAlert();
 
   const active = members.filter(m => !m.removed);
   const removed = members.filter(m => m.removed);
@@ -455,7 +464,7 @@ function MemberEditor({
     return updates;
   }
 
-  function remove(m: MemberRecord) {
+  async function remove(m: MemberRecord) {
     const net = netOf(m.id);
     if (net !== 0) {
       // A non-zero balance that's purely internal to a settled party (a couple
@@ -465,20 +474,26 @@ function MemberEditor({
       const partyNet = partyMembers.reduce((s, o) => s + netOf(o.id), 0);
       const owed = formatMoney(Math.abs(net), groupCurrency);
       if (!(m.party && partyMembers.length >= 2 && partyNet === 0)) {
-        alert(
-          `${m.name} isn't settled up — ${net > 0 ? `the group owes them ${owed}` : `they owe ${owed}`}.\n\n` +
+        await alert({
+          title: `${m.name} isn’t settled up`,
+          message:
+            `${net > 0 ? `The group owes them ${owed}` : `They owe ${owed}`}.\n\n` +
             'Square their balance to zero on the Balances tab first, then remove them.',
-        );
+        });
         return;
       }
       const partyName = partyDisplayName(partyMembers);
       if (
-        !confirm(
-          `Within ${partyName}, ${m.name} ${net < 0 ? `owes ${owed}` : `is owed ${owed}`} — but the ` +
+        !(await confirm({
+          title: `Remove ${m.name}?`,
+          message:
+            `Within ${partyName}, ${m.name} ${net < 0 ? `owes ${owed}` : `is owed ${owed}`} — but the ` +
             `household nets to zero.\n\n` +
-            `Remove ${m.name}? This records that ${owed} settle-up inside ${partyName} so it stays ` +
-            `square, then drops ${m.name} from everything going forward. You can restore them later.`,
-        )
+            `This records that ${owed} settle-up inside ${partyName} so it stays square, then drops ` +
+            `${m.name} from everything going forward. You can restore them later.`,
+          confirmLabel: 'Remove',
+          danger: true,
+        }))
       ) {
         return;
       }
@@ -509,12 +524,15 @@ function MemberEditor({
     }
     if (referenced(m.id)) {
       if (
-        !confirm(
-          `Remove ${m.name}?\n\n` +
-            "They'll stay on the past expenses they were part of, but drop off " +
+        !(await confirm({
+          title: `Remove ${m.name}?`,
+          message:
+            'They’ll stay on the past expenses they were part of, but drop off ' +
             'everything going forward — no new splits, no settle-up, no party. ' +
             'You can restore them later from the Removed list.',
-        )
+          confirmLabel: 'Remove',
+          danger: true,
+        }))
       ) {
         return;
       }
@@ -522,10 +540,13 @@ function MemberEditor({
       run(async () => replaceMembers(await Promise.all(softRemove(m))));
     } else {
       if (
-        !confirm(
-          `Delete ${m.name}?\n\n` +
-            "They've never been in an expense, so they'll be removed completely. This can't be undone.",
-        )
+        !(await confirm({
+          title: `Delete ${m.name}?`,
+          message:
+            'They’ve never been in an expense, so they’ll be removed completely. This can’t be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
+        }))
       ) {
         return;
       }
@@ -832,6 +853,7 @@ function SecuritySection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const confirm = useConfirm();
 
   useEffect(() => {
     api
@@ -875,22 +897,32 @@ function SecuritySection({
     }
   }
 
-  function enablePin() {
+  async function enablePin() {
     if (
-      !confirm(
-        `Turn on the PIN for "${group.name}"?\n\n` +
+      !(await confirm({
+        title: `Turn on the PIN for “${group.name}”?`,
+        message:
           'The share link changes: links shared before now stop working, and ' +
           'everyone currently in the group will be asked for the PIN once — ' +
           'so tell them what it is.',
-      )
+        confirmLabel: 'Turn on PIN',
+      }))
     ) {
       return;
     }
     apply({ pin }, 'PIN is on. Invite people with the share button and tell them the PIN.');
   }
 
-  function disablePin() {
-    if (!confirm('Turn off the PIN?\n\nAnyone with the share link can join again, no PIN asked.')) return;
+  async function disablePin() {
+    if (
+      !(await confirm({
+        title: 'Turn off the PIN?',
+        message: 'Anyone with the share link can join again, no PIN asked.',
+        confirmLabel: 'Turn off PIN',
+        danger: true,
+      }))
+    )
+      return;
     apply({ disable_pin: true }, 'PIN is off — the link alone is enough to join again.');
   }
 

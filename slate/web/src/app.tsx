@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { DivvyApi } from './api';
 import { Home } from './views/Home';
 import { Group } from './views/Group';
+import { DialogProvider } from './components/ConfirmDialog';
 
 const API_URL =
   (import.meta.env.VITE_POCKETBASE_URL as string) ??
@@ -49,9 +50,10 @@ export function App() {
   const hash = useHash();
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 
+  let content;
   if (parts[0] === 'g' && parts[1]) {
     const hasToken = parts[2] !== undefined && TOKEN_RE.test(parts[2]);
-    return (
+    content = (
       <Group
         key={parts[1]}
         groupId={parts[1]}
@@ -59,6 +61,8 @@ export function App() {
         sub={parts.slice(hasToken ? 3 : 2)}
       />
     );
+  } else {
+    content = <Home />;
   }
-  return <Home />;
+  return <DialogProvider>{content}</DialogProvider>;
 }
