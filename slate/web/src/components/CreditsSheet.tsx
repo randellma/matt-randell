@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '../app';
 import { CREDIT_PACKS, type CreditPackId } from '../api';
 import { useUser } from '../account';
+import { useSwipeToClose } from '../hooks/useSwipeToClose';
 
 interface Props {
   open: boolean;
@@ -19,6 +20,7 @@ interface Props {
  */
 export function CreditsSheet({ open, onClose, reason = 'account', onChanged }: Props) {
   const user = useUser();
+  const sheetRef = useSwipeToClose(open, onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +47,7 @@ export function CreditsSheet({ open, onClose, reason = 'account', onChanged }: P
   return (
     <div class="share-overlay" onClick={onClose}>
       <div
+        ref={sheetRef}
         class="share-sheet"
         role="dialog"
         aria-modal="true"

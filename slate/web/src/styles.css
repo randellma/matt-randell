@@ -667,10 +667,17 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
   box-shadow: 0 -22px 44px -20px rgba(0, 0, 0, 0.6);
   animation: share-sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex; flex-direction: column; gap: 16px;
-  max-height: 90%; overflow-y: auto;
+  max-height: 90%; overflow-y: auto; overscroll-behavior: contain;
 }
 @keyframes share-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
-.share-handle { align-self: center; flex: none; width: 38px; height: 4px; border-radius: 2px; background: var(--line); }
+/* The grab handle: a generous, touch-only hit area so a pull anywhere near it
+   starts the drag-to-dismiss rather than scrolling the panel. */
+.share-handle {
+  align-self: center; flex: none; width: 38px; height: 4px; margin: 2px 0;
+  border-radius: 2px; background: var(--line);
+  box-sizing: content-box; padding: 8px 22px; background-clip: content-box;
+  touch-action: none; cursor: grab;
+}
 .share-head { display: flex; align-items: flex-start; gap: 10px; }
 .share-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .share-title { font-weight: 800; font-size: 1.25rem; line-height: 1.05; color: var(--ink); }

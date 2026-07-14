@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { generate } from 'lean-qr';
+import { useSwipeToClose } from '../hooks/useSwipeToClose';
 
 /** ink #20251E on transparent — the paper grain shows through the code */
 const INK: [number, number, number, number] = [0x20, 0x25, 0x1e, 255];
@@ -29,6 +30,7 @@ interface Props {
 export function ShareDrawer({ open, onClose, groupName, url, pinOn }: Props) {
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sheetRef = useSwipeToClose(open, onClose);
 
   useEffect(() => {
     if (open && canvasRef.current) {
@@ -84,6 +86,7 @@ export function ShareDrawer({ open, onClose, groupName, url, pinOn }: Props) {
   return (
     <div class="share-overlay" onClick={onClose}>
       <div
+        ref={sheetRef}
         class="share-sheet"
         role="dialog"
         aria-modal="true"
