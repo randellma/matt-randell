@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { api } from '../app';
 import { receiptIsPdf } from '../api';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PayerEntry, ReceiptRecord, ScanAllowance, SplitData } from '../api';
-import { allocate, allocateEven } from '../lib/money';
+import { allocate, allocateEven, rescale } from '../lib/money';
 import {
   allCurrencies,
   convertMinor,
@@ -383,6 +383,22 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
   }, [mode, amountCents, percents, formMembers]);
 
   const owesEntries = mode === 'percent' ? percentDisplayEntries : (preview.entries ?? null);
+
+  // "Who owes what" always reports in group currency (what Balances/settle-up
+  // use), rescaling the split proportionally the same way a stored foreign
+  // expense's entries get rescaled for balances (see expenseForBalance).
+  const owesEntriesGroupCurrency = useMemo<SplitEntry[] | null>(() => {
+    if (!owesEntries) return null;
+    if (!foreign) return owesEntries;
+    const total = fxCents !== null && fxCents > 0 ? fxCents : amountCents;
+    if (total === null) return owesEntries;
+    try {
+      const scaled = rescale(owesEntries.map(e => e.cents), total);
+      return owesEntries.map((e, i) => ({ ...e, cents: scaled[i]! }));
+    } catch {
+      return owesEntries;
+    }
+  }, [owesEntries, foreign, fxCents, amountCents]);
 
   async function scanReceipt(file: File) {
     setScanState('working');
@@ -835,10 +851,10 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
 
       <div>
         <div class="seclbl left">Who owes what</div>
-        {owesEntries ? (
+        {owesEntriesGroupCurrency ? (
           <ul class="preview-list" style="margin-top:11px;">
             {(() => {
-              const entries = owesEntries!;
+              const entries = owesEntriesGroupCurrency!;
               const maxCents = Math.max(1, ...entries.map(e => e.cents));
               return entries.map(e => (
                 <li key={e.member}>
@@ -852,7 +868,7 @@ export function ExpenseForm({ group, token, members, me, expense, onDone }: Prop
                   <span class="preview-bar-track">
                     <span class="preview-bar-fill" style={{ width: `${Math.round((e.cents / maxCents) * 100)}%` }} />
                   </span>
-                  <b class="num">{formatMoney(e.cents, currency)}</b>
+                  <b class="num">{formatMoney(e.cents, groupCurrency)}</b>
                 </li>
               ));
             })()}
