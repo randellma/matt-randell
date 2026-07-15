@@ -1,7 +1,7 @@
 # Slate: sign-in-to-cover returns to the card; paywall only at zero
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: complete
 **Blocked by**: none
 
 ## What to build
