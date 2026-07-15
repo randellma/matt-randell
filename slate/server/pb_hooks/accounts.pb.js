@@ -11,7 +11,7 @@
 //
 // Env (all shared with the existing hooks):
 //   RESEND_API_KEY             — required for sign-in code emails
-//   DIVVY_EMAIL_FROM           — sender, default "Slate <slate@mattrandell.com>"
+//   DIVVY_EMAIL_FROM           — sender, default "Slate <hello@heyslate.app>"
 //   DIVVY_RESEND_API_BASE      — default "https://api.resend.com" (test override)
 //   DIVVY_GOOGLE_CLIENT_ID     — Google OAuth client; sign-in shows Google
 //   DIVVY_GOOGLE_CLIENT_SECRET — only when both are set

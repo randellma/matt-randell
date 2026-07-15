@@ -96,6 +96,57 @@ resource "cloudflare_ruleset" "heyslate_www_redirect" {
   }]
 }
 
+# Resend sending domain (mirrors mattrandell.com's setup: "send" subdomain,
+# us-east-1). Slate's emails come from hello@heyslate.app. MX/SPF/DMARC are
+# fixed values; the DKIM key is minted by Resend when the domain is added
+# there — see docs/issues/0025 for the one-time hand-off.
+resource "cloudflare_dns_record" "heyslate_send_mx" {
+  content  = "feedback-smtp.us-east-1.amazonses.com"
+  name     = "send.heyslate.app"
+  priority = 10
+  proxied  = false
+  tags     = []
+  ttl      = 1
+  type     = "MX"
+  zone_id  = cloudflare_zone.heyslate.id
+  settings = {}
+}
+
+resource "cloudflare_dns_record" "heyslate_send_spf" {
+  content  = "\"v=spf1 include:amazonses.com ~all\""
+  name     = "send.heyslate.app"
+  proxied  = false
+  tags     = []
+  ttl      = 1
+  type     = "TXT"
+  zone_id  = cloudflare_zone.heyslate.id
+  settings = {}
+}
+
+resource "cloudflare_dns_record" "heyslate_dmarc" {
+  content  = "\"v=DMARC1; p=none;\""
+  name     = "_dmarc.heyslate.app"
+  proxied  = false
+  tags     = []
+  ttl      = 1
+  type     = "TXT"
+  zone_id  = cloudflare_zone.heyslate.id
+  settings = {}
+}
+
+# TODO(issue 0025): uncomment and paste the p=… value Resend shows after the
+# heyslate.app domain is added there, then `terraform apply` and hit Verify.
+# resource "cloudflare_dns_record" "heyslate_resend_dkim" {
+#   content  = "\"p=<paste DKIM public key from Resend>\""
+#   name     = "resend._domainkey.heyslate.app"
+#   proxied  = false
+#   tags     = []
+#   ttl      = 1
+#   type     = "TXT"
+#   zone_id  = cloudflare_zone.heyslate.id
+#   settings = {}
+# }
+
 # Same zone-level hardening as mattrandell.com.
 resource "cloudflare_bot_management" "heyslate" {
   zone_id    = cloudflare_zone.heyslate.id

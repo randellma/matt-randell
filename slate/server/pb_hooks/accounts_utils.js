@@ -89,7 +89,7 @@ function sendEmail(to, subject, html) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Slate <slate@mattrandell.com>',
+      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Slate <hello@heyslate.app>',
       to: [to],
       subject: subject,
       html: html,

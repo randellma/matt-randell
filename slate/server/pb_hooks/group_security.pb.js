@@ -10,7 +10,7 @@
 //
 // Env:
 //   RESEND_API_KEY   — required for recovery emails (https://resend.com)
-//   DIVVY_EMAIL_FROM — sender, default "Slate <slate@mattrandell.com>";
+//   DIVVY_EMAIL_FROM — sender, default "Slate <hello@heyslate.app>";
 //                      the domain must be verified in Resend. (Env var keeps
 //                      the DIVVY_ prefix from the old brand — see README.)
 //   DIVVY_APP_URL    — PWA origin used in emailed links,
@@ -199,7 +199,7 @@ routerAdd('POST', '/api/divvy/groups/{id}/recover', (e) => {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Slate <slate@mattrandell.com>',
+      from: $os.getenv('DIVVY_EMAIL_FROM') || 'Slate <hello@heyslate.app>',
       to: [email],
       subject: `Your access link for “${name}” on Slate`,
       html: utils.recoveryEmailHtml(name, link),

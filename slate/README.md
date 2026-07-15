@@ -70,13 +70,13 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`,
    below); optionally `DIVVY_GOOGLE_CLIENT_ID` + `DIVVY_GOOGLE_CLIENT_SECRET`
    (enables Google sign-in — see below),
    `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
-   (default `Slate <slate@mattrandell.com>`), and `DIVVY_APP_URL` (default
+   (default `Slate <hello@heyslate.app>`), and `DIVVY_APP_URL` (default
    `https://heyslate.app`). The `DIVVY_*` env var **names** are kept
-   from the old brand so existing deployments need no env changes — but if you
-   previously **set** `DIVVY_APP_URL` to an older value, update it to
-   `https://heyslate.app` so emailed links point at the current host. The
-   sender stays `slate@mattrandell.com` (Resend-verified domain); moving it
-   to `@heyslate.app` would need that domain verified in Resend first.
+   from the old brand so existing deployments need no env changes — but if
+   you previously **set** `DIVVY_APP_URL` or `DIVVY_EMAIL_FROM` to older
+   values, update (or unset) them so emails come from the current host. The
+   default sender requires `heyslate.app` to be verified in Resend (see
+   below) **before** this code is deployed, or sign-in/recovery emails fail.
 4. Expose port 8080 and add **both** `api.heyslate.app` and
    `divvy-api.mattrandell.com` as domains so Traefik routes them through the
    existing Cloudflare Tunnel (the old host stays answering for installed
@@ -158,9 +158,11 @@ Recovery emails and account sign-in codes go out through
 [Resend](https://resend.com)'s HTTP API from PocketBase hooks — no SMTP
 setup. One-time setup:
 
-1. In the Resend dashboard, verify the sending domain (`mattrandell.com`) —
-   already done if another app sends from it — and create an API key
-   (sending-only, its own key per app is good hygiene).
+1. In the Resend dashboard, verify the sending domain (`heyslate.app`,
+   region `us-east-1`): the MX/SPF/DMARC records are already in
+   `terraform/heyslate.tf`; paste the DKIM key Resend mints into the
+   commented `heyslate_resend_dkim` record there and `terraform apply`.
+   Create an API key (sending-only, its own key per app is good hygiene).
 2. Set `RESEND_API_KEY` on the backend (Coolify env var, next to
    `ANTHROPIC_API_KEY`). Without it, everything works except recovery emails,
    which fail with a clear "not configured" message.
