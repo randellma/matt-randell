@@ -1,7 +1,7 @@
 # Scan credits on optional accounts; groups may draw from a sponsor
 
 ---
-Status: accepted — amends [ADR-0001](0001-no-accounts-link-token-access.md) (accounts exist, but only for scan credits; group access is unchanged) and [ADR-0002](0002-receipt-ocr-via-claude.md) (scans are now metered)
+Status: accepted — amends [ADR-0001](0001-no-accounts-link-token-access.md) (accounts exist, but only for scan credits; group access is unchanged) and [ADR-0002](0002-receipt-ocr-via-claude.md) (scans are now metered); amended by [ADR-0005](0005-claims-link-members-to-accounts.md) (accounts also carry a profile and your groups; custom OTP replaced by PocketBase-native auth)
 ---
 
 Receipt scanning is Slate's one costly feature (a Claude API call per scan) and its monetization path. Scans are metered by **scan credits** held on an optional **account**: a `users` auth record signed into with a 6-digit emailed code — no passwords. A scan spends one credit, resolved at upload time: the scanner's own balance first, otherwise the balance of a group **sponsor** (an account that opted to cover the group), otherwise the scan is refused with a top-up prompt. Everything else in Slate remains account-free.

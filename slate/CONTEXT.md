@@ -9,12 +9,16 @@ A shared ledger of Expenses and Payments among a set of Members, identified by i
 _Avoid_: Household, party, event
 
 **Member**:
-A name inside a Group. Not an account — just a label people attach expenses to. Anyone holding the link may add themselves as a Member or act as any existing Member. A Member may be removed once their Balance is zero: one who never appeared in an Expense or Payment is deleted outright, while one with history is kept but flagged `removed` — off every picker, unlinked from any Party, still named on the Expenses they were part of, and restorable.
+A name inside a Group. Not an account — just a label people attach expenses to. Anyone holding the link may add themselves as a Member or act as any existing unclaimed Member (see Claim). A Member may be removed once their Balance is zero: one who never appeared in an Expense or Payment is deleted outright, while one with history is kept but flagged `removed` — off every picker, unlinked from any Party, still named on the Expenses they were part of, and restorable.
 _Avoid_: User, account, participant (participant means something narrower — see Split)
 
 **Identity**:
-The Member a device has picked as "you" for a Group, stored locally. Purely a convenience default for *paid by* — never a security boundary.
+The Member a device has picked as "you" for a Group, stored locally. Purely a convenience default for *paid by* — never a security boundary. For a signed-in Account with a Claim in the Group, the claimed Member is the Identity.
 _Avoid_: Login, session
+
+**Claim**:
+The optional link between a Member and an Account. Only the signed-in Account itself can claim or release a Member — nobody can claim on another's behalf. A claimed Member leaves everyone else's identity picker and wears a signed-in badge; everything else about them stays group-editable. A social marker, not a security boundary.
+_Avoid_: Ownership, binding, verified member
 
 **Expense**:
 Money one or more Members paid that others owe shares of. Has a description, an amount, Payers, a date, and exactly one Split.
@@ -33,8 +37,8 @@ A photo or PDF of an itemized bill (PDFs cover emailed receipts — rides, hotel
 _Avoid_: Scan (for the artifact — a Scan is the paid act of parsing), upload
 
 **Account**:
-An optional sign-in (email + 6-digit emailed code, no password) that exists solely to hold Scan Credits — never required for joining, splitting, or attaching photos (ADR-0004 amending ADR-0001). Identified to Groups only by its display name.
-_Avoid_: User (in code the collection is `users`, but in prose an account is not a Member), login, profile
+An optional sign-in (a 6-digit emailed code or Google — never a password) that holds Scan Credits, a profile (display name, photo), and — through its Claims — the Groups that follow you across devices. Never required for joining, splitting, or attaching photos (ADR-0004 amending ADR-0001); an Account still gates nothing but Scans. Inside a Group it is named by its claimed Member where a Claim exists, its profile name otherwise, a masked email as the last resort — a Claim never renames the Member.
+_Avoid_: User (in code the collection is `users`, but in prose an account is not a Member), login, profile (for the whole thing — the profile is one part of an Account)
 
 **Scan Credit**:
 The metered unit of receipt scanning: one successful parse spends one credit. Lives on an Account as a balance backed by an append-only ledger (`credit_events`); arrives via a welcome grant (5 on first sign-in) or a purchased pack (free during beta, real payments later). Failed parses cost nothing.

@@ -1,7 +1,7 @@
 # No accounts: a group link is the only credential
 
 ---
-Status: accepted — amended by [ADR-0003](0003-optional-group-pin.md) (optional per-group PIN on joining) and [ADR-0004](0004-scan-credits-optional-accounts.md) (optional accounts exist, but only to hold scan credits; group access is still link-only)
+Status: accepted — amended by [ADR-0003](0003-optional-group-pin.md) (optional per-group PIN on joining), [ADR-0004](0004-scan-credits-optional-accounts.md) (optional accounts exist, but only to hold scan credits; group access is still link-only), and [ADR-0005](0005-claims-link-members-to-accounts.md) (a claimed member leaves everyone else's identity picker; group access is still link-only)
 ---
 
 Divvy has no user accounts, no login, and no roles. Each group has a random secret token generated at creation; the share link embeds it (`/#/g/<id>/<token>`). The PWA keeps the token in localStorage and attaches it as a `?t=` query param; PocketBase collection rules (`group.t = @request.query.t`) gate every read and write. Anyone holding the link can act as any member.
