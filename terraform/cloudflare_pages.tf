@@ -48,10 +48,13 @@ resource "cloudflare_dns_record" "divvy" {
   settings = {}
 }
 
-# Slate — the app formerly served at divvy.mattrandell.com. The Divvy hostname
-# is kept (above) but 301-redirected here by the dynamic-redirect ruleset in
-# cloudflare.tf, so old share links keep resolving. The PocketBase backend
-# stays at divvy-api.mattrandell.com (unchanged) so installed PWAs don't break.
+# Slate — now served at heyslate.app (custom domain in heyslate.tf). The
+# legacy hostnames are kept: divvy.mattrandell.com 301s to heyslate.app
+# (ruleset in cloudflare.tf), and slate.mattrandell.com (below) still serves
+# the shell so it can hand off localStorage group tokens client-side — see
+# the ruleset comment in cloudflare.tf. The PocketBase backend answers at
+# api.heyslate.app and keeps divvy-api.mattrandell.com alive for installed
+# PWAs pinned to the old origin.
 resource "cloudflare_pages_project" "slate" {
   account_id        = "894ff489298bdf1ca445fc9469854b25"
   name              = "slate-mattrandell"

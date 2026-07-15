@@ -63,12 +63,24 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homeserver" {
           origin_server_name = "inventory-api.mattrandell.com"
         }
       },
+      # Slate's PocketBase answers on two hostnames: api.heyslate.app (current)
+      # and divvy-api.mattrandell.com (kept so installed PWAs pinned to the old
+      # origin keep working). Both must be added as domains on the Coolify app
+      # so Traefik has a router for each SNI.
       {
         hostname = "divvy-api.mattrandell.com"
         service  = "https://localhost:443"
         origin_request = {
           no_tls_verify      = true
           origin_server_name = "divvy-api.mattrandell.com"
+        }
+      },
+      {
+        hostname = "api.heyslate.app"
+        service  = "https://localhost:443"
+        origin_request = {
+          no_tls_verify      = true
+          origin_server_name = "api.heyslate.app"
         }
       },
       {
