@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import type { ComponentChildren } from 'preact';
 import { api, navigate } from '../app';
 import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, ScanAllowance, SecurityInfo, SponsorshipRecord } from '../api';
 import { convertMinor, formatMoney } from '../lib/currency';
@@ -12,6 +11,7 @@ import { groupParties, partyDisplayName } from '../lib/party';
 import { forgetGroup, newToken } from '../identity';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
+import { PhotoInput } from '../components/PhotoInput';
 import { CreditsSheet } from '../components/CreditsSheet';
 import { useUser } from '../account';
 import { useAlert, useConfirm } from '../components/ConfirmDialog';
@@ -424,37 +424,6 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
 
       <div class="thanks">*** Thank you ***</div>
     </div>
-  );
-}
-
-/** A file picker dressed as whatever it wraps — a tappable avatar or a button. */
-function PhotoInput({
-  class: cls,
-  busy,
-  onPick,
-  children,
-}: {
-  class?: string;
-  busy: boolean;
-  onPick: (file: File) => void;
-  children: ComponentChildren;
-}) {
-  return (
-    <label class={cls ?? 'photo-tap'}>
-      {children}
-      <input
-        type="file"
-        accept="image/*"
-        hidden
-        disabled={busy}
-        onChange={e => {
-          const input = e.target as HTMLInputElement;
-          const file = input.files?.[0];
-          input.value = '';
-          if (file) onPick(file);
-        }}
-      />
-    </label>
   );
 }
 

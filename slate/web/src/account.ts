@@ -1,6 +1,6 @@
 /**
- * The optional account — exists only so scan credits have somewhere to live
- * (ADR-0004). Group membership stays link-only; this never gates a group.
+ * The optional account — scan credits plus a profile (ADR-0004, ADR-0005).
+ * Group membership stays link-only; this never gates a group.
  */
 
 import { useEffect, useState } from 'preact/hooks';

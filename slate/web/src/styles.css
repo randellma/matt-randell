@@ -651,6 +651,24 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 .invite-btn:active { background: var(--paper2); }
 .invite-btn svg { flex: none; }
 
+/* the signed-in account row at the foot of Home — opens the Account sheet */
+.account-btn {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 8px 12px; border: 1.5px dashed var(--line); border-radius: 6px;
+  background: none; cursor: pointer; transition: 0.12s;
+}
+.account-btn:active { background: var(--paper2); }
+.account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.account-name {
+  font-weight: 700; font-size: 0.94rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.account-scans {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-weight: 700; font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--faint);
+}
+
 /* the invite drawer — a bottom sheet with the two ways into a group */
 .share-overlay {
   position: fixed; inset: 0; z-index: 25;
@@ -808,6 +826,12 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 .pack-price { margin-left: auto; font-weight: 700; font-size: 0.95rem; color: var(--ink); }
 .beta-note { text-align: left; }
 .credits-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem; }
+/* the Account sheet's credit ledger — dotted-lead receipt lines */
+.ledger { display: flex; flex-direction: column; gap: 7px; max-height: 190px; overflow-y: auto; }
+.ledger-row { display: flex; align-items: flex-end; }
+.ledger-row .nm { font-size: 0.9rem; }
+.ledger-row b { font-size: 0.95rem; }
+.ledger-date { margin-left: 8px; font-size: 0.72rem; color: var(--faint); white-space: nowrap; }
 /* sign-in: Google button + the "or" seam above the emailed-code fields */
 .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; border-style: solid; }
 .google-btn svg { flex: none; }

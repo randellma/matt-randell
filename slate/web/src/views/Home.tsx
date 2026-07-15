@@ -2,11 +2,11 @@ import { useEffect, useState } from 'preact/hooks';
 import { api, groupPath, navigate } from '../app';
 import { aggregateUnits, computeNets, expenseForBalance, paymentGroupCents } from '../lib/balances';
 import { detectCurrency, formatMoney } from '../lib/currency';
-import { collectiveInitials, GROUP_AVATAR_COLOR } from '../lib/avatar';
+import { collectiveInitials, colorForId, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
 import { activeMembers } from '../lib/member';
 import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
-import { CreditsSheet } from '../components/CreditsSheet';
+import { AccountSheet } from '../components/AccountSheet';
 import { useUser } from '../account';
 import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
 
@@ -68,7 +68,7 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
 export function Home() {
   const [creating, setCreating] = useState(false);
   const [opening, setOpening] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const user = useUser();
   const groups = listJoinedGroups();
   const summaries = useGroupSummaries(groups);
@@ -84,7 +84,7 @@ export function Home() {
         <div class="wordmark">SLATE</div>
         <div class="stars">* * * * *</div>
         <div class="subline">Split expenses without the fuss</div>
-        <div class="subline" style="margin-top:3px;">No accounts · No sign-ups</div>
+        <div class="subline" style="margin-top:3px;">A group is just a link · No sign-up to join</div>
       </div>
       <hr class="rule" />
 
@@ -139,23 +139,38 @@ export function Home() {
 
       {groups.length === 0 && !creating && !opening && (
         <p class="hint sans">
-          A group is just a link — anyone with it is in. No accounts, no
-          sign-ups, no fuss. Already have a link (say, from Safari)? Tap “Open
-          a group link” to pull it in here.
+          A group is just a link — anyone with it is in. No sign-ups, no fuss.
+          Already have a link (say, from Safari)? Tap “Open a group link” to
+          pull it in here.
         </p>
       )}
 
       <hr class="rule" style="margin-top:6px;" />
-      <button class="invite-btn" onClick={() => setPlusOpen(true)}>
-        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-          <circle cx="12" cy="13" r="4" />
-        </svg>
-        {user ? `Receipt scans · ${user.credits} left` : 'Receipt scans · sign in'}
-      </button>
+      {user ? (
+        <button class="account-btn" onClick={() => setAccountOpen(true)}>
+          <Avatar
+            initials={personInitial(user.name || user.email)}
+            color={colorForId(user.id)}
+            size={36}
+            src={api.userPhotoUrl(user)}
+          />
+          <span class="account-main">
+            <span class="account-name">{user.name || user.email}</span>
+            <span class="account-scans">{user.credits} scan{user.credits === 1 ? '' : 's'} left</span>
+          </span>
+        </button>
+      ) : (
+        <button class="invite-btn" onClick={() => setAccountOpen(true)}>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+          </svg>
+          Account · Sign in
+        </button>
+      )}
       <div class="thanks">*** Thank you ***</div>
 
-      <CreditsSheet open={plusOpen} onClose={() => setPlusOpen(false)} />
+      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
     </div>
   );
 }

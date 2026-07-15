@@ -1,4 +1,4 @@
-import PocketBase from 'pocketbase';
+import PocketBase, { type AuthRecord } from 'pocketbase';
 import type { SplitEntry, SplitMode } from './lib/split';
 import type { AssignedItem, ParsedReceipt } from './lib/receipt';
 
@@ -110,14 +110,28 @@ export interface ReceiptRecord {
   error: string;
 }
 
-/** The signed-in account — exists only to hold scan credits (ADR-0004). */
+/** The signed-in account: scan credits plus a profile (ADR-0004, ADR-0005). */
 export interface UserRecord {
   id: string;
   email: string;
-  /** display name shown where this account's credits cover a group; '' = masked email */
+  /** profile display name shown wherever the account surfaces; '' = email */
   name: string;
+  /** profile photo filename; '' = initials avatar */
+  avatar: string;
   /** live scan-credit balance */
   credits: number;
+}
+
+/**
+ * One row of the append-only ledger behind the credit balance — a welcome
+ * grant, a pack purchase, or a scan spend. The Account sheet's history.
+ */
+export interface CreditEventRecord {
+  id: string;
+  delta: number;
+  reason: 'welcome' | 'purchase' | 'scan' | 'admin';
+  note: string;
+  created: string;
 }
 
 /**
@@ -173,7 +187,7 @@ export class DivvyApi {
    * link-access anyway (same stance as receipt images).
    */
   private fileUrl(
-    collection: 'groups' | 'members' | 'receipts',
+    collection: 'groups' | 'members' | 'receipts' | 'users',
     recordId: string,
     filename: string,
     thumb?: string,
@@ -193,6 +207,10 @@ export class DivvyApi {
 
   memberPhotoUrl(m: MemberRecord): string | undefined {
     return m.photo ? this.fileUrl('members', m.id, m.photo) : undefined;
+  }
+
+  userPhotoUrl(u: UserRecord): string | undefined {
+    return u.avatar ? this.fileUrl('users', u.id, u.avatar) : undefined;
   }
 
   /** The party's photo lives (mirrored) on its members — first one wins. */
@@ -438,6 +456,7 @@ export class DivvyApi {
       id: r.id,
       email: (r as { email?: string }).email ?? '',
       name: (r as { name?: string }).name ?? '',
+      avatar: (r as { avatar?: string }).avatar ?? '',
       credits: (r as { credits?: number }).credits ?? 0,
     };
   }
@@ -490,23 +509,47 @@ export class DivvyApi {
     this.pb.authStore.clear();
   }
 
-  /** Re-fetch the signed-in record (fresh credits). Clears a dead session. */
+  /**
+   * Re-fetch the signed-in record (fresh credits). Clears a dead session.
+   * Not the SDK's authRefresh: that saves its response into the auth store
+   * whenever it lands, so a sign-out (or a fresh sign-in) racing an
+   * in-flight refresh would be silently overwritten. A raw send leaves the
+   * store alone, and the result applies only if the session it refreshed is
+   * still the current one.
+   */
   async refreshUser(): Promise<UserRecord | null> {
     if (!this.pb.authStore.isValid) return null;
+    const before = this.pb.authStore.token;
+    const current = () => this.pb.authStore.token === before;
     try {
-      await this.pb.collection('users').authRefresh();
+      const res: { token: string; record: AuthRecord } =
+        await this.pb.send('/api/collections/users/auth-refresh', { method: 'POST' });
+      if (current()) this.pb.authStore.save(res.token, res.record);
     } catch {
-      this.pb.authStore.clear();
+      if (current()) this.pb.authStore.clear();
     }
     return this.user;
   }
 
-  /** Set the display name shown where this account's credits cover a group. */
+  /** Set the account's profile display name. */
   async setUserName(name: string): Promise<void> {
     const id = this.pb.authStore.record?.id;
     if (!id) return;
     const rec = await this.pb.collection('users').update(id, { name });
     this.pb.authStore.save(this.pb.authStore.token, rec);
+  }
+
+  /** Set (or with null, remove) the account's profile photo. */
+  async setUserPhoto(photo: Blob | null): Promise<void> {
+    const id = this.pb.authStore.record?.id;
+    if (!id) return;
+    const rec = await this.pb.collection('users').update(id, this.photoPayload('avatar', photo));
+    this.pb.authStore.save(this.pb.authStore.token, rec);
+  }
+
+  /** The signed-in account's credit ledger, newest first (list rule scopes it to the owner). */
+  async listCreditEvents(): Promise<CreditEventRecord[]> {
+    return this.pb.collection('credit_events').getFullList({ sort: '-created' });
   }
 
   /** Buy a pack. Beta: granted instantly, no payment taken. */
