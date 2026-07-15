@@ -131,7 +131,7 @@ export function buildCardSvg(opts = {}) {
   const ctaH = 96;
   const ctaW = runWidth(cta, ctaSize) + ctaPadX * 2;
   const ctaY = 452;
-  const footnote = invite ? 'No account · no sign-up' : 'slate.mattrandell.com';
+  const footnote = invite ? 'No account · no sign-up' : 'heyslate.app';
   const ctaSvg = `<g>
     <rect x="${PAD}" y="${ctaY}" width="${ctaW}" height="${ctaH}" rx="18" fill="${CHALK}"/>
     <text x="${PAD + ctaW / 2}" y="${ctaY + ctaH / 2 + ctaSize * 0.34}" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="${ctaSize}" fill="${INK}">${escapeXml(cta)}</text>

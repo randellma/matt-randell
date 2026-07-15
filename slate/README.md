@@ -11,14 +11,18 @@ Couples and families can be linked into a **party** (Balances tab): they order
 individually but settle as one wallet, so group balances stay simple while the
 internal breakdown remains visible.
 
-> **Rebrand note:** this app was previously **Divvy**. The user-facing brand and
-> the PWA host are now Slate (`slate.mattrandell.com`), and `divvy.mattrandell.com`
-> 301-redirects there so old share links keep working. The backend host,
-> PocketBase routes (`/api/divvy/*`), and `DIVVY_*` env vars deliberately keep
-> the old name so already-installed apps and the running server don't break.
+> **Rebrand/domain note:** this app was previously **Divvy**, then lived at
+> `slate.mattrandell.com`; it now has its own domain, **heyslate.app**.
+> `divvy.mattrandell.com` 301-redirects there, and `slate.mattrandell.com`
+> still serves the app shell so it can hand off localStorage group tokens
+> client-side ([`web/src/migrate.ts`](web/src/migrate.ts)) — only its
+> path-form share links (`/g/*`, `/og/*`) are edge-redirected. PocketBase
+> routes (`/api/divvy/*`) and `DIVVY_*` env vars deliberately keep the old
+> name, and the old backend host `divvy-api.mattrandell.com` stays answering
+> alongside `api.heyslate.app` so already-installed PWAs don't break.
 
-- **PWA**: `slate.mattrandell.com` (Cloudflare Pages) — Preact + Vite, in [`web/`](web/)
-- **Backend**: `divvy-api.mattrandell.com` — PocketBase on the Home Server (Coolify,
+- **PWA**: `heyslate.app` (Cloudflare Pages) — Preact + Vite, in [`web/`](web/)
+- **Backend**: `api.heyslate.app` — PocketBase on the Home Server (Coolify,
   via the Cloudflare Tunnel), defined in [`server/`](server/)
 
 See [CONTEXT.md](CONTEXT.md) for the domain language and [docs/adr/](docs/adr/) for decisions.
@@ -47,10 +51,11 @@ Messages API response shape).
 
 **PWA** deploys automatically: pushes to `main` touching `slate/web/**` run
 [`deploy-slate-pwa.yml`](../.github/workflows/deploy-slate-pwa.yml), which
-builds and pushes `dist/` to the `slate-mattrandell` Pages project. The Pages
-project, custom domain, the divvy→slate redirect, and all DNS records are
-Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
-— run `terraform apply` once before first deploy.
+builds and pushes `dist/` to the `slate-mattrandell` Pages project (serving
+`heyslate.app` plus the legacy `slate.mattrandell.com`). The Pages project,
+custom domains, the legacy-host redirects, and all DNS records are
+Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`,
+`terraform/heyslate.tf`) — run `terraform apply` once before first deploy.
 
 **Backend** is a Coolify app on the Home Server (same pattern as
 `inventory-api`):
@@ -66,14 +71,16 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
    (enables Google sign-in — see below),
    `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
    (default `Slate <slate@mattrandell.com>`), and `DIVVY_APP_URL` (default
-   `https://slate.mattrandell.com`). The `DIVVY_*` env var **names** are kept
+   `https://heyslate.app`). The `DIVVY_*` env var **names** are kept
    from the old brand so existing deployments need no env changes — but if you
-   previously **set** `DIVVY_EMAIL_FROM` or `DIVVY_APP_URL` to divvy values,
-   update them to the slate ones so recovery emails read "Slate" and link
-   straight to slate.mattrandell.com. `slate@mattrandell.com` is on the same
-   Resend-verified `mattrandell.com` domain, so no new domain verification.
-4. Expose port 8080 and add the `divvy-api.mattrandell.com` domain so Traefik
-   routes it through the existing Cloudflare Tunnel.
+   previously **set** `DIVVY_APP_URL` to an older value, update it to
+   `https://heyslate.app` so emailed links point at the current host. The
+   sender stays `slate@mattrandell.com` (Resend-verified domain); moving it
+   to `@heyslate.app` would need that domain verified in Resend first.
+4. Expose port 8080 and add **both** `api.heyslate.app` and
+   `divvy-api.mattrandell.com` as domains so Traefik routes them through the
+   existing Cloudflare Tunnel (the old host stays answering for installed
+   PWAs pinned to the old origin).
 5. On first boot, migrations auto-apply. Create the superuser for the admin UI
    with `./pocketbase superuser upsert <email> <pass>` inside the container
    (only needed for admin access — the app itself never uses it).
@@ -131,8 +138,10 @@ setup:
 1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
    create an **OAuth client ID** of type *Web application* (configure the
    OAuth consent screen first if the project has none). Add
-   `https://divvy-api.mattrandell.com/api/oauth2-redirect` as an **authorized
+   `https://api.heyslate.app/api/oauth2-redirect` as an **authorized
    redirect URI** — the redirect goes to the PocketBase host, not the PWA.
+   (Keep `https://divvy-api.mattrandell.com/api/oauth2-redirect` listed too
+   while installed PWAs on the old origin are still around.)
 2. Set `DIVVY_GOOGLE_CLIENT_ID` and `DIVVY_GOOGLE_CLIENT_SECRET` on the
    backend (Coolify env vars) and restart — a boot hook writes them into the
    users collection's OAuth2 config, and the button appears.

@@ -242,8 +242,8 @@ resource "cloudflare_bot_management" "mattrandell" {
 }
 
 resource "cloudflare_zone_setting" "hsts" {
-  zone_id     = "cb009dc3da4929bf68ef21b73d4552f1"
-  setting_id  = "security_header"
+  zone_id    = "cb009dc3da4929bf68ef21b73d4552f1"
+  setting_id = "security_header"
   value = {
     strict_transport_security = {
       enabled            = true
@@ -255,34 +255,57 @@ resource "cloudflare_zone_setting" "hsts" {
   }
 }
 
-# Divvy → Slate rebrand: 301-redirect every divvy.mattrandell.com request to
-# the same path on slate.mattrandell.com, so existing share links
-# (divvy.mattrandell.com/g/<id>/<token>) and bookmarks keep working. Dynamic
-# redirects run before Pages serves the divvy custom domain, so the divvy Pages
-# project (kept in cloudflare_pages.tf) simply stops receiving traffic. The
-# backend host divvy-api.mattrandell.com is intentionally NOT redirected —
+# Legacy-host redirects to heyslate.app (a zone can hold only one ruleset per
+# phase, so both live here):
+#   - divvy.mattrandell.com (pre-rebrand host): everything 301s to the same
+#     path on heyslate.app — directly, not via slate.mattrandell.com, to
+#     avoid a redirect chain.
+#   - slate.mattrandell.com: only path-form share links (/g/*) and their
+#     preview images (/og/*) are edge-redirected — those carry the group
+#     credential in the URL and store nothing locally. Every other path keeps
+#     serving the app shell, which hands off localStorage group tokens to
+#     heyslate.app client-side (slate/web/src/migrate.ts); an edge 301 there
+#     would strand them, since localStorage is origin-bound.
+# The backend host divvy-api.mattrandell.com is intentionally NOT redirected —
 # installed PWAs still call it directly.
 resource "cloudflare_ruleset" "divvy_to_slate_redirect" {
   zone_id = "cb009dc3da4929bf68ef21b73d4552f1"
-  name    = "Redirect divvy.mattrandell.com to slate.mattrandell.com"
+  name    = "Redirect legacy Slate hosts to heyslate.app"
   kind    = "zone"
   phase   = "http_request_dynamic_redirect"
 
-  rules = [{
-    ref         = "divvy_to_slate"
-    description = "301 divvy.mattrandell.com/* -> slate.mattrandell.com/* (path + query preserved)"
-    expression  = "(http.host eq \"divvy.mattrandell.com\")"
-    action      = "redirect"
-    action_parameters = {
-      from_value = {
-        status_code           = 301
-        preserve_query_string = true
-        target_url = {
-          expression = "concat(\"https://slate.mattrandell.com\", http.request.uri.path)"
+  rules = [
+    {
+      ref         = "divvy_to_heyslate"
+      description = "301 divvy.mattrandell.com/* -> heyslate.app/* (path + query preserved)"
+      expression  = "(http.host eq \"divvy.mattrandell.com\")"
+      action      = "redirect"
+      action_parameters = {
+        from_value = {
+          status_code           = 301
+          preserve_query_string = true
+          target_url = {
+            expression = "concat(\"https://heyslate.app\", http.request.uri.path)"
+          }
+        }
+      }
+    },
+    {
+      ref         = "slate_share_links_to_heyslate"
+      description = "301 slate.mattrandell.com share links (/g/*, /og/*) -> heyslate.app"
+      expression  = "(http.host eq \"slate.mattrandell.com\" and (starts_with(http.request.uri.path, \"/g/\") or starts_with(http.request.uri.path, \"/og/\")))"
+      action      = "redirect"
+      action_parameters = {
+        from_value = {
+          status_code           = 301
+          preserve_query_string = true
+          target_url = {
+            expression = "concat(\"https://heyslate.app\", http.request.uri.path)"
+          }
         }
       }
     }
-  }]
+  ]
 }
 
 

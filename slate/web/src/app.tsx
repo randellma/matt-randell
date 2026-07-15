@@ -6,7 +6,7 @@ import { DialogProvider } from './components/ConfirmDialog';
 
 const API_URL =
   (import.meta.env.VITE_POCKETBASE_URL as string) ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:8090' : 'https://divvy-api.mattrandell.com');
+  (import.meta.env.DEV ? 'http://127.0.0.1:8090' : 'https://api.heyslate.app');
 
 export const api = new DivvyApi(API_URL);
 

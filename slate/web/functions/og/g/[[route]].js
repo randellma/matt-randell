@@ -10,7 +10,7 @@ import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import { buildCardSvg } from '../../../og/card.js';
 import { fontBuffers } from '../../../og/fonts.js';
 
-const DEFAULT_PB_URL = 'https://divvy-api.mattrandell.com';
+const DEFAULT_PB_URL = 'https://api.heyslate.app';
 
 // initWasm rejects a second call, so kick it off once per isolate.
 const wasmReady = initWasm(resvgWasm);

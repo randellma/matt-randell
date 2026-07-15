@@ -14,7 +14,7 @@
 //                      the domain must be verified in Resend. (Env var keeps
 //                      the DIVVY_ prefix from the old brand — see README.)
 //   DIVVY_APP_URL    — PWA origin used in emailed links,
-//                      default "https://slate.mattrandell.com"
+//                      default "https://heyslate.app"
 //   DIVVY_RESEND_API_BASE — default "https://api.resend.com" (overridable
 //                      for tests, same pattern as DIVVY_OCR_API_BASE)
 
@@ -183,7 +183,7 @@ routerAdd('POST', '/api/divvy/groups/{id}/recover', (e) => {
     return e.json(503, { code: 'email_unconfigured', message: 'Recovery email is not configured on this server (RESEND_API_KEY).' });
   }
 
-  const appUrl = ($os.getenv('DIVVY_APP_URL') || 'https://slate.mattrandell.com').replace(/\/$/, '');
+  const appUrl = ($os.getenv('DIVVY_APP_URL') || 'https://heyslate.app').replace(/\/$/, '');
   const name = group.getString('name');
   // Hash form so the token stays out of server/CDN request logs, same
   // reasoning as ADR-0001.

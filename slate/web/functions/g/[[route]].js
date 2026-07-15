@@ -7,12 +7,12 @@
 // group, and browsers get the same shell — app.tsx normalizes the path back
 // to the hash route before mounting.
 
-const DEFAULT_PB_URL = 'https://divvy-api.mattrandell.com';
+const DEFAULT_PB_URL = 'https://api.heyslate.app';
 
 // Bump when the card template (og/card.js) changes — it's folded into the
 // og:image ?v= so a redesign busts the edge cache even when a group's name
 // and roster are unchanged. Without it, template changes never reach crawlers.
-const CARD_VERSION = '2';
+const CARD_VERSION = '3';
 
 const escapeHtml = (s) =>
   s.replace(/[&<>"']/g, (c) =>
