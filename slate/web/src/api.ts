@@ -447,21 +447,42 @@ export class DivvyApi {
     return this.pb.authStore.onChange(() => cb(this.user));
   }
 
-  /** Email a 6-digit sign-in code; creates the account on first contact. */
-  async requestAuthCode(email: string): Promise<void> {
-    await this.pb.send('/api/divvy/auth/request-code', { method: 'POST', body: { email } });
+  /**
+   * Email a 6-digit sign-in code; creates the account on first contact
+   * (a server hook backs PocketBase's native OTP — ADR-0005). Returns the
+   * otpId the code must be traded in with.
+   */
+  async requestAuthCode(email: string): Promise<string> {
+    const res = await this.pb.collection('users').requestOTP(email);
+    return res.otpId;
   }
 
   /** Trade the emailed code for a session. First sign-in grants welcome credits. */
-  async verifyAuthCode(email: string, code: string): Promise<UserRecord> {
-    const res: { token: string } = await this.pb.send('/api/divvy/auth/verify', {
-      method: 'POST',
-      body: { email, code },
-    });
-    this.pb.authStore.save(res.token);
-    // Pull the real record through the collection API so authStore holds a
-    // refreshable model (credits and all), not just our route's summary.
-    await this.pb.collection('users').authRefresh();
+  async verifyAuthCode(otpId: string, code: string): Promise<UserRecord> {
+    await this.pb.collection('users').authWithOTP(otpId, code);
+    return this.user!;
+  }
+
+  /**
+   * Whether the server has Google sign-in configured (the provider only
+   * appears once its credentials are set — the button hides otherwise).
+   */
+  async googleSignInAvailable(): Promise<boolean> {
+    try {
+      const methods = await this.pb.collection('users').listAuthMethods();
+      return methods.oauth2.enabled && methods.oauth2.providers.some(p => p.name === 'google');
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Google sign-in via PocketBase's all-in-one OAuth2 flow (popup +
+   * realtime). Lands on the existing account when the email already signed
+   * in by code. First sign-in grants welcome credits, same as the code path.
+   */
+  async signInWithGoogle(): Promise<UserRecord> {
+    await this.pb.collection('users').authWithOAuth2({ provider: 'google' });
     return this.user!;
   }
 

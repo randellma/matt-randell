@@ -62,7 +62,8 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
 2. Add a persistent volume mounted at `/pb/pb_data`.
 3. Set env vars: `ANTHROPIC_API_KEY` (required for receipt OCR);
    `RESEND_API_KEY` (required for PIN-recovery and sign-in-code emails — see
-   below); optionally
+   below); optionally `DIVVY_GOOGLE_CLIENT_ID` + `DIVVY_GOOGLE_CLIENT_SECRET`
+   (enables Google sign-in — see below),
    `DIVVY_OCR_MODEL` (default `claude-haiku-4-5`), `DIVVY_EMAIL_FROM`
    (default `Slate <slate@mattrandell.com>`), and `DIVVY_APP_URL` (default
    `https://slate.mattrandell.com`). The `DIVVY_*` env var **names** are kept
@@ -81,9 +82,12 @@ Terraform-managed (`terraform/cloudflare_pages.tf`, `terraform/cloudflare.tf`)
 
 Receipt scanning is metered by **scan credits** on an optional account —
 the only thing in Slate that has one (see
-[ADR-0004](docs/adr/0004-scan-credits-optional-accounts.md)). Sign-in is a
-6-digit code emailed via Resend (`/api/divvy/auth/request-code` + `/verify`);
-no passwords. First sign-in grants 5 credits; packs (10/$2.99, 30/$6.99) are
+[ADR-0004](docs/adr/0004-scan-credits-optional-accounts.md)). Sign-in is
+PocketBase-native (ADR-0005): a 6-digit code emailed via Resend
+(`requestOTP`/`authWithOTP`, with hooks adding auto-create on first contact,
+a 60s resend cooldown, and a 5-try cap per code) or, when configured,
+Google — never a password. First sign-in grants 5 credits; packs
+(10/$2.99, 30/$6.99) are
 recorded through `/api/divvy/credits/purchase` and, while in beta, granted
 free — the `purchases` row carries `status`/`provider`/`provider_ref` so a
 real payment provider can slot in later without schema changes.
@@ -115,6 +119,29 @@ stop granting access (current members just re-enter with the PIN once). A
 recovery email address can be set per group — the join screen's "forgot the
 PIN?" button emails that address the group's access link. See
 [ADR-0003](docs/adr/0003-optional-group-pin.md).
+
+## Google sign-in (optional)
+
+"Continue with Google" uses PocketBase's native OAuth2 provider (ADR-0005)
+and is wired entirely from env: the sign-in sheet only shows the button when
+the server reports the provider, so the feature deploys safely with no
+credentials — the flow stays email-code only until they exist. One-time
+setup:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
+   create an **OAuth client ID** of type *Web application* (configure the
+   OAuth consent screen first if the project has none). Add
+   `https://divvy-api.mattrandell.com/api/oauth2-redirect` as an **authorized
+   redirect URI** — the redirect goes to the PocketBase host, not the PWA.
+2. Set `DIVVY_GOOGLE_CLIENT_ID` and `DIVVY_GOOGLE_CLIENT_SECRET` on the
+   backend (Coolify env vars) and restart — a boot hook writes them into the
+   users collection's OAuth2 config, and the button appears.
+
+Google sign-in lands on the existing account when the (verified) email
+already signed in by code — credits, purchases, and sponsorships carry over —
+and fills an empty profile name/photo from the Google profile without ever
+overwriting values the user set. Removing the env vars disables the provider
+again on next boot.
 
 ## Recovery & sign-in emails (Resend)
 

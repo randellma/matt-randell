@@ -1,7 +1,7 @@
 # Slate: migrate sign-in to PocketBase-native OTP
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: complete
 **Blocked by**: none
 
 ## What to build
@@ -17,13 +17,13 @@ Keep the existing posture: password auth stays disabled, code length/expiry/atte
 
 ## Acceptance criteria
 
-- [ ] Signing in with an emailed 6-digit code works end-to-end through PocketBase's native OTP endpoints; the custom auth routes are gone
-- [ ] Requesting a code for a never-seen email creates the account and sends the code (no separate sign-up step)
-- [ ] OTP emails are delivered via Resend and look like the current sign-in email
-- [ ] First verified sign-in grants 5 welcome Scan Credits exactly once (a `credit_events` row, as today)
-- [ ] Rate limits at least match the current posture: code expiry, attempt cap, resend cooldown, single-use codes
-- [ ] Password auth remains disabled; the `otp_*` fields are removed in a migration with a working down-migration
-- [ ] Existing accounts (and their credits/sponsorships) sign in unchanged after the migration
+- [x] Signing in with an emailed 6-digit code works end-to-end through PocketBase's native OTP endpoints; the custom auth routes are gone
+- [x] Requesting a code for a never-seen email creates the account and sends the code (no separate sign-up step)
+- [x] OTP emails are delivered via Resend and look like the current sign-in email
+- [x] First verified sign-in grants 5 welcome Scan Credits exactly once (a `credit_events` row, as today)
+- [x] Rate limits at least match the current posture: code expiry, attempt cap, resend cooldown, single-use codes
+- [x] Password auth remains disabled; the `otp_*` fields are removed in a migration with a working down-migration
+- [x] Existing accounts (and their credits/sponsorships) sign in unchanged after the migration
 
 ## Blocked by
 

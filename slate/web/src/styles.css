@@ -808,6 +808,15 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 .pack-price { margin-left: auto; font-weight: 700; font-size: 0.95rem; color: var(--ink); }
 .beta-note { text-align: left; }
 .credits-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem; }
+/* sign-in: Google button + the "or" seam above the emailed-code fields */
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; border-style: solid; }
+.google-btn svg { flex: none; }
+.or-divider {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+.or-divider::before, .or-divider::after { content: ''; flex: 1; border-top: 1.5px dashed var(--line); }
 .linkish {
   font-family: 'Space Mono', ui-monospace, monospace; font-weight: 700; font-size: 0.69rem;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);

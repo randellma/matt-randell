@@ -1,7 +1,7 @@
 # Slate: Google sign-in via native OAuth2
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: complete
 **Blocked by**: 0018
 
 ## What to build
@@ -14,12 +14,12 @@ Facebook is explicitly out of scope (deferred in ADR-0005 until someone asks).
 
 ## Acceptance criteria
 
-- [ ] With Google credentials configured, the sign-in flow shows a Google option alongside the emailed code; completing it signs the user in
-- [ ] With no credentials configured, the sign-in flow is unchanged (no broken button) and the app builds/deploys cleanly
-- [ ] First Google sign-in fills an empty profile name/photo from the Google account; existing values are never overwritten
-- [ ] Google sign-in with an email that already signed in by code lands on the same Account (same credits, purchases, sponsorships)
-- [ ] A brand-new Google sign-in gets the 5-credit welcome grant exactly once
-- [ ] Setup for the manual step is documented (where the env vars go, the redirect URL to register with Google)
+- [x] With Google credentials configured, the sign-in flow shows a Google option alongside the emailed code; completing it signs the user in *(full round-trip needs the real Google client — the popup leg was verified up to Google's door with placeholder credentials)*
+- [x] With no credentials configured, the sign-in flow is unchanged (no broken button) and the app builds/deploys cleanly
+- [x] First Google sign-in fills an empty profile name/photo from the Google account; existing values are never overwritten
+- [x] Google sign-in with an email that already signed in by code lands on the same Account (same credits, purchases, sponsorships)
+- [x] A brand-new Google sign-in gets the 5-credit welcome grant exactly once
+- [x] Setup for the manual step is documented (where the env vars go, the redirect URL to register with Google — see slate/README.md "Google sign-in (optional)")
 
 ## Blocked by
 

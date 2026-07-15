@@ -1,9 +1,10 @@
 // Helpers for accounts.pb.js and credits.pb.js. Plain module (no .pb.js
 // suffix) so it isn't registered as a hook file itself; loaded via require().
 
-// Sign-in codes: 6 digits, short-lived, few tries — the account guards spent
-// money at most, so this mirrors the group-PIN posture (lockable, not fancy).
-const OTP_TTL_S = 10 * 60;
+// Sign-in codes: short-lived, few tries — the account guards spent money at
+// most, so this mirrors the group-PIN posture (lockable, not fancy). Length
+// and expiry live in the users collection's OTP config (migration
+// 1751600013); these two govern the hooks layered on the native flow.
 const OTP_COOLDOWN_S = 60;
 const OTP_MAX_ATTEMPTS = 5;
 
@@ -17,19 +18,6 @@ const PACKS = {
   p10: { credits: 10, price_cents: 299, label: '10 scans' },
   p30: { credits: 30, price_cents: 699, label: '30 scans' },
 };
-
-/** Same digest posture as the group PIN: the lockout is the defense. */
-function hashOtp(salt, code) {
-  return $security.sha256(salt + ':' + code);
-}
-
-function randomOtp() {
-  return $security.randomStringWithAlphabet(6, '0123456789');
-}
-
-function now() {
-  return Math.floor(Date.now() / 1000);
-}
 
 /** Balance change + matching ledger row, always together. `refs` may carry
  * group/receipt/purchase record ids for the audit trail. */
@@ -122,14 +110,10 @@ function otpEmailHtml(code) {
 }
 
 module.exports = {
-  OTP_TTL_S,
   OTP_COOLDOWN_S,
   OTP_MAX_ATTEMPTS,
   WELCOME_CREDITS,
   PACKS,
-  hashOtp,
-  randomOtp,
-  now,
   addCredits,
   displayName,
   resolveScanSource,

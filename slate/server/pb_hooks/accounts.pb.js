@@ -2,107 +2,159 @@
 
 // Optional accounts + scan credits (docs/adr/0004-scan-credits-optional-accounts.md).
 //
-// Groups never require an account (ADR-0001); these routes exist only so scan
-// credits have somewhere to live. Sign-in is a 6-digit emailed code — the
-// only writer of users' auth state, same posture as the group PIN routes.
+// Groups never require an account (ADR-0001); accounts exist only so scan
+// credits have somewhere to live. Sign-in is PocketBase-native: a 6-digit
+// emailed code (requestOTP/authWithOTP) or, when configured, Google OAuth2 —
+// never a password (ADR-0005). The hooks below bend the native flows to the
+// old posture: auto-create on first contact, delivery via Resend, a resend
+// cooldown, a per-code attempt cap, and the one-time welcome grant.
 //
 // Env (all shared with the existing hooks):
-//   RESEND_API_KEY        — required for sign-in code emails
-//   DIVVY_EMAIL_FROM      — sender, default "Slate <slate@mattrandell.com>"
-//   DIVVY_RESEND_API_BASE — default "https://api.resend.com" (test override)
+//   RESEND_API_KEY             — required for sign-in code emails
+//   DIVVY_EMAIL_FROM           — sender, default "Slate <slate@mattrandell.com>"
+//   DIVVY_RESEND_API_BASE      — default "https://api.resend.com" (test override)
+//   DIVVY_GOOGLE_CLIENT_ID     — Google OAuth client; sign-in shows Google
+//   DIVVY_GOOGLE_CLIENT_SECRET — only when both are set
 
-// Ask for a sign-in code. Creates the account on first contact — an
-// unverified user record is just a mailbox for the code.
-routerAdd('POST', '/api/divvy/auth/request-code', (e) => {
+// ── Sign-in: emailed code (native OTP) ────────────────────────────────────
+
+// Auto-create on first contact. Native requestOTP silently no-ops for
+// unknown emails (enumeration protection); Slate has no separate sign-up, so
+// an unverified user record is just a mailbox for the code — create it and
+// let the flow continue.
+onRecordRequestOTPRequest((e) => {
   const utils = require(`${__hooks}/accounts_utils.js`);
-  const sec = require(`${__hooks}/group_security_utils.js`);
 
-  const email = String((e.requestInfo().body || {}).email || '').trim().toLowerCase();
-  if (!sec.validEmail(email)) {
-    return e.json(400, { code: 'bad_email', message: 'That does not look like an email address.' });
-  }
-
-  let user;
-  try {
-    user = e.app.findAuthRecordByEmail('users', email);
-  } catch {
-    user = new Record(e.app.findCollectionByNameOrId('users'));
+  if (!e.record) {
+    // The endpoint already rejected malformed emails; mirror the old routes'
+    // normalization so Foo@Bar.com and foo@bar.com stay one account.
+    const email = String((e.requestInfo().body || {}).email || '').trim().toLowerCase();
+    const user = new Record(e.app.findCollectionByNameOrId('users'));
     user.set('email', email);
     // Password auth is disabled; this is just PocketBase's required minimum.
     user.set('password', $security.randomString(30));
+    e.app.save(user);
+    e.record = user;
   }
 
-  const now = utils.now();
-  const wait = utils.OTP_COOLDOWN_S - (now - user.getInt('otp_sent_at'));
-  if (wait > 0) {
-    return e.json(429, { code: 'cooldown', retry_in: wait, message: 'A code was just sent — check your inbox.' });
+  // Same resend posture as before: one code a minute, and a new code burns
+  // every earlier one — exactly one live code per account.
+  const now = Math.floor(Date.now() / 1000);
+  for (const otp of e.app.findAllOTPsByRecord(e.record)) {
+    if (now - otp.getDateTime('created').unix() < utils.OTP_COOLDOWN_S) {
+      throw new ApiError(429, 'A code was just sent — check your inbox.', {});
+    }
   }
+  e.app.deleteAllOTPsByRecord(e.record);
 
-  const code = utils.randomOtp();
-  const salt = $security.randomString(16);
-  user.set('otp_salt', salt);
-  user.set('otp_hash', utils.hashOtp(salt, code));
-  user.set('otp_attempts', 0);
-  user.set('otp_expires', now + utils.OTP_TTL_S);
-  user.set('otp_sent_at', now);
-  e.app.save(user);
+  e.next();
+}, 'users');
 
-  // After saving, so a failed send still burns the old code but the cooldown
-  // stays honest about when mail actually went out.
-  utils.sendEmail(email, 'Your Slate sign-in code', utils.otpEmailHtml(code));
-  return e.json(200, { sent: true });
+// Deliver the code through Resend, keeping the current email look. Not
+// calling e.next() skips PocketBase's SMTP mailer entirely — but the default
+// send is also what stamps the OTP's sentTo (which native auth-with-otp
+// checks before flipping `verified`), so stamp it here ourselves. Native
+// sends run fire-and-forget, so a Resend failure logs instead of surfacing.
+onMailerRecordOTPSend((e) => {
+  const utils = require(`${__hooks}/accounts_utils.js`);
+  const email = e.record.email();
+  utils.sendEmail(email, 'Your Slate sign-in code', utils.otpEmailHtml(e.meta.password));
+  const otp = e.app.findOTPById(e.meta.otpId);
+  otp.setSentTo(email);
+  e.app.save(otp);
+}, 'users');
+
+// Cap wrong guesses per code. Natively the cap is per IP (5 per 3 minutes);
+// the old flow burned the code after 5 wrong tries total, so keep that:
+// count failures per otpId and delete the OTP at the limit. Counters live in
+// the in-memory app store — a restart forgives, the 10-minute expiry doesn't.
+routerUse((e) => {
+  // Match by id too — /api/collections/{name-or-ID}/auth-with-otp both work,
+  // and a guesser must not sidestep the cap by switching to the id form.
+  if (e.request.method !== 'POST' || !/^\/api\/collections\/[^/]+\/auth-with-otp$/.test(e.request.url.path)) {
+    return e.next();
+  }
+  const utils = require(`${__hooks}/accounts_utils.js`);
+
+  const otpId = String((e.requestInfo().body || {}).otpId || '');
+  const key = 'otp_fails_' + otpId;
+  if (otpId && (e.app.store().get(key) || 0) >= utils.OTP_MAX_ATTEMPTS) {
+    try {
+      e.app.delete(e.app.findOTPById(otpId));
+    } catch {
+      /* already gone */
+    }
+    e.app.store().remove(key);
+    throw new BadRequestError('Wrong or expired code — request a new one.');
+  }
+  try {
+    e.next();
+    e.app.store().remove(key); // success consumed the code
+  } catch (err) {
+    if (otpId) e.app.store().set(key, (e.app.store().get(key) || 0) + 1);
+    throw err;
+  }
 });
 
-// Trade a correct code for an auth token. First verified sign-in comes with
-// the welcome credits.
-routerAdd('POST', '/api/divvy/auth/verify', (e) => {
+// First verified sign-in comes with the welcome credits — exactly once, on
+// any method (emailed code or Google; both flip `verified` before this event
+// fires). Also fires on token refreshes, hence the `welcomed` latch. Granting
+// before e.next() puts the fresh balance in the sign-in response itself.
+onRecordAuthRequest((e) => {
   const utils = require(`${__hooks}/accounts_utils.js`);
-  const sec = require(`${__hooks}/group_security_utils.js`);
-
-  const body = e.requestInfo().body || {};
-  const email = String(body.email || '').trim().toLowerCase();
-  const code = String(body.code || '').trim();
-
-  let user;
-  try {
-    user = e.app.findAuthRecordByEmail('users', email);
-  } catch {
-    return e.json(400, { code: 'wrong_code', message: 'Wrong or expired code.' });
-  }
-
-  const now = utils.now();
-  const stale =
-    user.getString('otp_hash') === '' ||
-    now > user.getInt('otp_expires') ||
-    user.getInt('otp_attempts') >= utils.OTP_MAX_ATTEMPTS;
-  if (stale || !/^\d{6}$/.test(code) || utils.hashOtp(user.getString('otp_salt'), code) !== user.getString('otp_hash')) {
-    if (!stale) {
-      user.set('otp_attempts', user.getInt('otp_attempts') + 1);
-      e.app.save(user);
-    }
-    return e.json(400, { code: 'wrong_code', message: 'Wrong or expired code — request a new one.' });
-  }
-
-  user.set('otp_hash', '');
-  user.set('otp_salt', '');
-  user.set('verified', true);
-  e.app.save(user);
-
-  if (!user.getBool('welcomed')) {
+  const user = e.record;
+  if (user && user.getBool('verified') && !user.getBool('welcomed')) {
     user.set('welcomed', true);
     utils.addCredits(e.app, user, utils.WELCOME_CREDITS, 'welcome');
   }
+  e.next();
+}, 'users');
 
-  return e.json(200, {
-    token: user.newAuthToken(),
-    user: {
-      id: user.id,
-      email: user.getString('email'),
-      name: user.getString('name'),
-      credits: user.getInt('credits'),
-    },
-  });
+// ── Sign-in: Google (native OAuth2, ADR-0005) ─────────────────────────────
+
+// The provider is wired entirely from env so the feature ships before the
+// Google client exists: with both vars set, Google appears in
+// listAuthMethods and the PWA shows the button; without them, sign-in stays
+// email-code only. Register <api-host>/api/oauth2-redirect as the OAuth
+// client's redirect URI (see slate/README.md).
+onBootstrap((e) => {
+  e.next();
+  const clientId = $os.getenv('DIVVY_GOOGLE_CLIENT_ID') || '';
+  const clientSecret = $os.getenv('DIVVY_GOOGLE_CLIENT_SECRET') || '';
+  const enabled = clientId !== '' && clientSecret !== '';
+  const users = e.app.findCollectionByNameOrId('users');
+  users.oauth2.enabled = enabled;
+  users.oauth2.providers = enabled ? [{ name: 'google', clientId, clientSecret }] : [];
+  // On sign-up PocketBase imports the Google profile into these itself; the
+  // auth hook below covers accounts that predate their first Google sign-in.
+  users.oauth2.mappedFields = { id: '', name: 'name', username: '', avatarURL: 'avatar' };
+  e.app.save(users);
 });
+
+// Fill profile blanks from the Google profile — name and photo — never
+// overwriting what the user already set. Matters for accounts that signed in
+// by code first: OAuth2 lands on them by verified email, skipping the
+// sign-up path where mappedFields would have imported the profile.
+onRecordAuthWithOAuth2Request((e) => {
+  e.next();
+  const user = e.record;
+  const oa = e.oAuth2User;
+  if (!user || !oa) return;
+  let changed = false;
+  if (user.getString('name') === '' && oa.name !== '') {
+    user.set('name', oa.name);
+    changed = true;
+  }
+  if (user.getString('avatar') === '' && oa.avatarURL !== '') {
+    try {
+      user.set('avatar', $filesystem.fileFromURL(oa.avatarURL));
+      changed = true;
+    } catch (err) {
+      e.app.logger().warn('Failed to import the Google avatar', 'error', String(err));
+    }
+  }
+  if (changed) e.app.save(user);
+}, 'users');
 
 // What a scan in this group would cost and whose balance it would charge —
 // the expense form renders its scan card straight from this. Token-gated
