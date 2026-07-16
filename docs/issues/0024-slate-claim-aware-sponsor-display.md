@@ -1,7 +1,7 @@
 # Slate: claim-aware sponsor display
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: complete
 **Blocked by**: 0022
 
 ## What to build
@@ -12,10 +12,10 @@ Sponsoring itself is unchanged: token + auth only, no Claim required to cover a 
 
 ## Acceptance criteria
 
-- [ ] A sponsor with a Claim in the group is shown by their claimed Member's name on the coverage card, in "Covered by …" copy, and on the expense form's scan card
-- [ ] A sponsor without a Claim falls back to profile name, then masked email — no behavior change for them
-- [ ] Renaming the claimed member updates what the group sees the sponsor as; releasing the claim falls back to the profile name
-- [ ] Covering a group still requires no Claim
+- [x] A sponsor with a Claim in the group is shown by their claimed Member's name on the coverage card, in "Covered by …" copy, and on the expense form's scan card
+- [x] A sponsor without a Claim falls back to profile name, then masked email — no behavior change for them
+- [x] Renaming the claimed member updates what the group sees the sponsor as; releasing the claim falls back to the profile name
+- [x] Covering a group still requires no Claim
 
 ## Blocked by
 
