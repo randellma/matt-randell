@@ -6,7 +6,8 @@ Personal site and infrastructure monorepo for `mattrandell.com`. See [CONTEXT-MA
 
 | Repo | Purpose |
 |---|---|
-| `matt-randell` (this repo, public) | Static site, Terraform for all infrastructure |
+| `matt-randell` (this repo, public) | Static site, Terraform for the `mattrandell.com` infrastructure |
+| `heyslate` (private) | Slate expense-splitting app + Terraform for the `heyslate.app` zone |
 | `wayfair-apps` (private) | Discount web app + Chrome extension |
 
 ## Infrastructure overview

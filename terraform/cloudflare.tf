@@ -264,8 +264,8 @@ resource "cloudflare_zone_setting" "hsts" {
 #     preview images (/og/*) are edge-redirected — those carry the group
 #     credential in the URL and store nothing locally. Every other path keeps
 #     serving the app shell, which hands off localStorage group tokens to
-#     heyslate.app client-side (slate/web/src/migrate.ts); an edge 301 there
-#     would strand them, since localStorage is origin-bound.
+#     heyslate.app client-side (web/src/migrate.ts in the heyslate repo); an
+#     edge 301 there would strand them, since localStorage is origin-bound.
 # The backend host divvy-api.mattrandell.com is intentionally NOT redirected —
 # installed PWAs still call it directly.
 resource "cloudflare_ruleset" "divvy_to_slate_redirect" {
