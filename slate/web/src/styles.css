@@ -18,6 +18,29 @@
   --chalkmut: #B4B7AB;
 }
 
+/* Dark mode — follows the device preference. The whole app is painted from the
+   custom properties above, so a dark theme is mostly a palette swap: ink and
+   paper trade places, the accent/red/green brighten to stay AA-legible on a
+   near-black paper, and the slate board barely moves (it's a chalkboard either
+   way). Values come straight from the Slate Rebrand v2 design's DARK palette. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ECE7D6;
+    --paper: #161817;
+    --paper2: #20231F;
+    --faint: #8E8B7C;
+    --line: #33362E;
+    --accent: #3AAE7C;
+    --green: #54B98B;
+    --red: #E27C63;
+    /* design has no warn tone; brighten the amber to match red/green's lift */
+    --warn: #D6A15C;
+    --slate: #25282C;
+    --chalk: #F2EEE2;
+    --chalkmut: #9EA096;
+  }
+}
+
 /* paper canvas behind browser chrome (iOS status bar) and overscroll,
    so the receipt reads as running off the top of the screen */
 html { -webkit-text-size-adjust: 100%; background: var(--paper); }
@@ -890,3 +913,18 @@ label.btn { cursor: pointer; display: inline-flex; align-items: center; }
 .spinner { width: 1.1rem; height: 1.1rem; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .big-spinner { width: 2.5rem; height: 2.5rem; border-width: 3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Dark-mode fixups for the handful of colours baked in above rather than drawn
+   from the palette. Physical-paper whites (receipt photos, the QR card, the
+   lightbox) stay white on purpose — a scanned slip doesn't invert. */
+@media (prefers-color-scheme: dark) {
+  /* the backdrop the receipt floats on: a touch darker than the paper so the
+     page's drop shadow still reads */
+  body {
+    background: #0B0D0C;
+    background-image: radial-gradient(circle at 22% 12%, rgba(255, 255, 255, 0.03), transparent 60%);
+  }
+  /* unassigned receipt line — was a cream block; make it a warm amber tint */
+  .item.unassigned { border-color: #C79A54; background: rgba(199, 154, 84, 0.12); }
+  .totals-line .li.warn .amt { color: var(--warn); }
+}
