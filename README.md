@@ -174,3 +174,4 @@ sudo cat /data/coolify/source/.env | gcloud secrets versions add coolify-env --p
 - `https://coolify.mattrandell.com` — Coolify dashboard loads
 - `https://discount.mattrandell.com` — discount app loads and login works
 - Push a commit to `wayfair-apps` main and confirm Coolify auto-deploys
+
