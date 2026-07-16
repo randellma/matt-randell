@@ -178,11 +178,11 @@ routerAdd('GET', '/api/divvy/groups/{id}/scan-allowance', (e) => {
     signed_in: me !== null,
     self_credits: me ? me.getInt('credits') : 0,
     source: src.source,
-    sponsor_name: src.source === 'sponsor' ? utils.displayName(src.user) : '',
+    sponsor_name: src.source === 'sponsor' ? utils.displayName(e.app, src.user, group.id) : '',
     // Everyone covering this group, for the settings screen.
     sponsors: utils.listSponsors(e.app, group.id).map((u) => ({
       user: u.id,
-      name: utils.displayName(u),
+      name: utils.displayName(e.app, u, group.id),
       credits: u.getInt('credits'),
     })),
   });

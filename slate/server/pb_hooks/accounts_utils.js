@@ -34,10 +34,35 @@ function addCredits(app, user, delta, reason, refs) {
   app.save(rec);
 }
 
-/** What a sponsor is called where their credits show up. */
-function displayName(user) {
+/** What a sponsor is called where their credits show up in a group. Claims win
+ * (docs/adr/0005-claims-link-members-to-accounts.md): wherever the sponsor
+ * holds a claim here the group already calls them by their member name, so that
+ * name leads; the account profile name is the claim-less fallback, then a
+ * masked email. Pass groupId to get the group-local name; omit it for the bare
+ * account-level name (profile → masked email). */
+function displayName(app, user, groupId) {
+  const claimed = groupId ? claimedMemberName(app, groupId, user.id) : '';
+  if (claimed) return claimed;
   const sec = require(`${__hooks}/group_security_utils.js`);
   return user.getString('name') || sec.maskEmail(user.getString('email'));
+}
+
+/** The name this group calls an account, if it holds a claim here — the member
+ * whose `user` points at the account. Empty when unclaimed (or the name is
+ * blank), so callers fall back to the account profile name. A dangling ref
+ * reads as unclaimed, matching the soft-claim stance. */
+function claimedMemberName(app, groupId, userId) {
+  if (!userId) return '';
+  try {
+    const member = app.findFirstRecordByFilter(
+      'members',
+      'group = {:g} && user = {:u}',
+      { g: groupId, u: userId },
+    );
+    return member.getString('name');
+  } catch {
+    return ''; // no claim in this group
+  }
 }
 
 /**
@@ -116,6 +141,7 @@ module.exports = {
   PACKS,
   addCredits,
   displayName,
+  claimedMemberName,
   resolveScanSource,
   listSponsors,
   sendEmail,

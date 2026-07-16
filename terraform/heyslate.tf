@@ -134,18 +134,16 @@ resource "cloudflare_dns_record" "heyslate_dmarc" {
   settings = {}
 }
 
-# TODO(issue 0025): uncomment and paste the p=… value Resend shows after the
-# heyslate.app domain is added there, then `terraform apply` and hit Verify.
-# resource "cloudflare_dns_record" "heyslate_resend_dkim" {
-#   content  = "\"p=<paste DKIM public key from Resend>\""
-#   name     = "resend._domainkey.heyslate.app"
-#   proxied  = false
-#   tags     = []
-#   ttl      = 1
-#   type     = "TXT"
-#   zone_id  = cloudflare_zone.heyslate.id
-#   settings = {}
-# }
+resource "cloudflare_dns_record" "heyslate_resend_dkim" {
+  content  = "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDkNAXO1hAuG006ztUvqb3m5gZl3pjp+ga1+1qk8QmvjgBFcKk5maMBSPbHbtGv33F76trnAYfQKHdoRlu0Rx/gBoE9Q5D6VR8m5dsU0Ic3UXY4CjD/aRQtAQVnopb0e6v0P/+H7nAddvZEo6T5pRSA5JquExTz/clCzjL1XFuAvQIDAQAB"
+  name     = "resend._domainkey.heyslate.app"
+  proxied  = false
+  tags     = []
+  ttl      = 1
+  type     = "TXT"
+  zone_id  = cloudflare_zone.heyslate.id
+  settings = {}
+}
 
 # Same zone-level hardening as mattrandell.com.
 resource "cloudflare_bot_management" "heyslate" {
