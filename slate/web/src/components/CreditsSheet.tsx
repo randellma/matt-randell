@@ -9,7 +9,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   /** why the sheet opened — tunes the headline */
-  reason?: 'out-of-scans' | 'signin' | 'account';
+  reason?: 'out-of-scans' | 'signin' | 'account' | 'cover';
   /** fires after anything that changes scan allowance: sign-in, top-up */
   onChanged?: () => void;
 }
@@ -35,15 +35,28 @@ export function CreditsSheet({ open, onClose, reason = 'account', onChanged }: P
 
   if (!open) return null;
 
+  // "Sign in to cover" wants a sign-in, not a sale: once the account lands
+  // with scans in hand (the welcome grant arrives in the sign-in response),
+  // the sheet closes and covering stays an explicit tap on the card. Only a
+  // zero balance keeps the sheet open, as a top-up framed around covering.
+  const signedIn = () => {
+    onChanged?.();
+    if (reason === 'cover' && (api.user?.credits ?? 0) > 0) onClose();
+  };
+
   const title = user
-    ? reason === 'out-of-scans' && user.credits <= 0
+    ? (reason === 'out-of-scans' || reason === 'cover') && user.credits <= 0
       ? 'Out of receipt scans'
       : 'Receipt scans'
-    : reason === 'signin' || reason === 'out-of-scans'
-      ? 'Sign in to scan receipts'
-      : 'Receipt scans';
+    : reason === 'cover'
+      ? 'Sign in to cover this group'
+      : reason === 'signin' || reason === 'out-of-scans'
+        ? 'Sign in to scan receipts'
+        : 'Receipt scans';
   const sub = user
-    ? 'Scans auto-fill the total, date and every line item straight from a photo.'
+    ? reason === 'cover' && user.credits <= 0
+      ? 'Covering the group spends your scans, and you have none left — top up so everyone here can scan.'
+      : 'Scans auto-fill the total, date and every line item straight from a photo.'
     : 'Scans live on a free account so they follow you across groups — new accounts start with 5.';
 
   return (
@@ -86,7 +99,7 @@ export function CreditsSheet({ open, onClose, reason = 'account', onChanged }: P
             </div>
           </div>
         ) : (
-          <SignInForm onSignedIn={onChanged} />
+          <SignInForm onSignedIn={signedIn} />
         )}
       </div>
     </div>

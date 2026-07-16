@@ -877,7 +877,8 @@ function ScanCreditsSection({ groupId, token, onSaved }: { groupId: string; toke
   /** my sponsorship row for this group, if I'm covering it */
   const [mine, setMine] = useState<SponsorshipRecord | null>(null);
   const [busy, setBusy] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);
+  /** null = closed; otherwise why the Slate Plus sheet is up */
+  const [plusReason, setPlusReason] = useState<'account' | 'cover' | null>(null);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
@@ -901,7 +902,7 @@ function ScanCreditsSection({ groupId, token, onSaved }: { groupId: string; toke
 
   async function toggleCover() {
     if (!user) {
-      setPlusOpen(true);
+      setPlusReason('cover');
       return;
     }
     setBusy(true);
@@ -948,7 +949,7 @@ function ScanCreditsSection({ groupId, token, onSaved }: { groupId: string; toke
           </span>
         </div>
         <div class="scan-cover-actions">
-          <button class="scan-cover-btn primary" onClick={() => setPlusOpen(true)}>
+          <button class="scan-cover-btn primary" onClick={() => setPlusReason('account')}>
             {user ? 'Top up' : 'Get scans'}
           </button>
           <button class="scan-cover-btn" disabled={busy} onClick={toggleCover}>
@@ -957,7 +958,12 @@ function ScanCreditsSection({ groupId, token, onSaved }: { groupId: string; toke
         </div>
       </div>
       {error && <p class="error">{error}</p>}
-      <CreditsSheet open={plusOpen} onClose={() => setPlusOpen(false)} onChanged={reload} />
+      <CreditsSheet
+        open={plusReason !== null}
+        reason={plusReason ?? 'account'}
+        onClose={() => setPlusReason(null)}
+        onChanged={reload}
+      />
     </div>
   );
 }
