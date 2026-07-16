@@ -15,9 +15,10 @@ import {
 } from '../lib/balances';
 import { formatMoney } from '../lib/currency';
 import { partyDisplayName } from '../lib/party';
-import { activeMembers } from '../lib/member';
+import { activeMembers, claimedByAnother } from '../lib/member';
 import { colorForId, collectiveInitials, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
-import { Avatar, AvatarStack } from '../components/Avatar';
+import { Avatar, AvatarStack, ClaimBadge } from '../components/Avatar';
+import { useUser } from '../account';
 import { ShareDrawer } from '../components/ShareDrawer';
 import { ExpenseForm } from './ExpenseForm';
 import { Balances } from './Balances';
@@ -37,7 +38,10 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
   const [payments, setPayments] = useState<PaymentRecord[] | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'expenses' | 'balances'>('expenses');
-  const [me, setMe] = useState<string | undefined>(getJoinedGroup(groupId)?.memberId);
+  // The identity this device picked ("me"). A claim held here overrides it —
+  // see `me` below — so a signed-in device is always its claimed member.
+  const [picked, setPicked] = useState<string | undefined>(getJoinedGroup(groupId)?.memberId);
+  const user = useUser();
   const [shareOpen, setShareOpen] = useState(false);
   // The working credential: from the URL on full links, from localStorage on
   // token-less ones. Empty until the PIN gate hands one over.
@@ -107,6 +111,52 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
     reload();
   }, [reload]);
 
+  // Holding a claim here IS your identity (ADR-0005) — keep the local pick
+  // and localStorage in step so the group follows you on this device even
+  // after signing out.
+  useEffect(() => {
+    if (!user || !members || !group || !token) return;
+    const claimed = members.find(m => !m.removed && m.user === user.id);
+    if (claimed && picked !== claimed.id) {
+      rememberGroup({ id: group.id, t: token, name: group.name, memberId: claimed.id });
+      setPicked(claimed.id);
+    }
+  }, [user?.id, members, group, token, picked]);
+
+  // This device already asserted "this is me": opening the group signed in
+  // silently claims that member. One attempt per member per visit — a lost
+  // race (someone claimed it meanwhile) refreshes the roster, and the render
+  // below falls back to the picker.
+  const claimTried = useRef<string>();
+  useEffect(() => {
+    if (!user || !members || !group || !token) return;
+    if (members.some(m => m.user === user.id)) return; // claim already held here
+    const mine = picked ? members.find(m => m.id === picked && !m.removed) : undefined;
+    if (!mine) return;
+    if (claimedByAnother(mine, user.id)) {
+      // Someone else claimed "me" — the local pick is stale; back to the picker.
+      rememberGroup({ id: group.id, t: token, name: group.name });
+      setPicked(undefined);
+      return;
+    }
+    if (claimTried.current === mine.id) return;
+    claimTried.current = mine.id;
+    let stale = false;
+    api
+      .claimMember(mine, token)
+      .then(m => {
+        if (!stale) setMembers(ms => ms?.map(x => (x.id === m.id ? m : x)) ?? ms);
+      })
+      .catch(() => {
+        api.listMembers(group.id, token).then(ms => {
+          if (!stale) setMembers(ms);
+        }).catch(() => {});
+      });
+    return () => {
+      stale = true;
+    };
+  }, [user?.id, members, group, token, picked]);
+
   if (pinInfo) {
     return (
       <PinGate
@@ -141,6 +191,9 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
   }
 
   const memberById = new Map(members.map(m => [m.id, m]));
+  // A claim held in this group auto-identifies — the join screen never shows.
+  const myClaim = user ? members.find(m => !m.removed && m.user === user.id) : undefined;
+  const me = myClaim?.id ?? picked;
   const meValid = me !== undefined && memberById.has(me);
 
   if (!meValid) {
@@ -149,10 +202,11 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         group={group}
         token={token}
         members={members}
+        onMembersChanged={setMembers}
         onJoined={(memberId, refreshedMembers) => {
           rememberGroup({ id: group.id, t: token, name: group.name, memberId });
           if (refreshedMembers) setMembers(refreshedMembers);
-          setMe(memberId);
+          setPicked(memberId);
         }}
       />
     );
@@ -169,7 +223,18 @@ export function Group({ groupId, token: urlToken, sub }: Props) {
         me={me!}
         onMeChange={memberId => {
           rememberGroup({ id: group.id, t: token, name: group.name, memberId });
-          setMe(memberId);
+          setPicked(memberId);
+        }}
+        onReleased={updated => {
+          // Update the roster in place so the claim doesn't linger in stale
+          // state, drop this device's pick (a release retracts "this is me" —
+          // otherwise the auto-claim above would just re-link it), and land
+          // on the "who are you?" picker.
+          setMembers(ms => ms?.map(x => (x.id === updated.id ? updated : x)) ?? ms);
+          claimTried.current = updated.id;
+          rememberGroup({ id: group.id, t: token, name: group.name });
+          setPicked(undefined);
+          navigate(groupPath(groupId, linkToken));
         }}
         onTokenRotated={t => {
           // Turning the PIN on rotated the token: adopt it here and get the
@@ -550,22 +615,51 @@ function JoinScreen({
   group,
   token,
   members,
+  onMembersChanged,
   onJoined,
 }: {
   group: GroupRecord;
   token: string;
   members: MemberRecord[];
+  /** the roster moved under us (a claim race) — let the parent re-render it */
+  onMembersChanged: (members: MemberRecord[]) => void;
   onJoined: (memberId: string, refreshedMembers?: MemberRecord[]) => void;
 }) {
-  const [newName, setNewName] = useState('');
+  const user = useUser();
+  // Signed in, "add yourself" starts from the profile name — usually zero typing.
+  const [newName, setNewName] = useState(user?.name ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  /** Tap a name: a local pick when signed out; identity + claim in one tap
+   *  when signed in (ADR-0005). */
+  async function pick(m: MemberRecord) {
+    if (!user || m.user === user.id) return onJoined(m.id);
+    setBusy(true);
+    setError('');
+    try {
+      const claimed = await api.claimMember(m, token);
+      onJoined(claimed.id, members.map(x => (x.id === claimed.id ? claimed : x)));
+    } catch {
+      // Almost certainly a lost race — someone claimed them just now.
+      // Refresh so their chip picks up the badge and disables.
+      setError(`Couldn't link ${m.name} to your account — they may have just been claimed.`);
+      try {
+        onMembersChanged(await api.listMembers(group.id, token));
+      } catch {
+        /* keep the stale roster; the error above explains the failed tap */
+      }
+      setBusy(false);
+    }
+  }
 
   async function addMe() {
     if (!newName.trim()) return;
     setBusy(true);
     try {
-      const m = await api.addMember(group.id, newName.trim(), token);
+      const m = user
+        ? await api.addClaimedMember(group.id, newName.trim(), token)
+        : await api.addMember(group.id, newName.trim(), token);
       const refreshed = await api.listMembers(group.id, token);
       onJoined(m.id, refreshed);
     } catch (e) {
@@ -587,12 +681,23 @@ function JoinScreen({
       </header>
       <section class="ticket-box">
         <div class="chip-row wrap">
-          {activeMembers(members).map(m => (
-            <button key={m.id} class="chip lg with-avatar" onClick={() => onJoined(m.id)}>
-              <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} src={api.memberPhotoUrl(m)} />
-              {m.name}
-            </button>
-          ))}
+          {activeMembers(members).map(m => {
+            // Claimed by someone else = provably not you: badged, un-tappable.
+            const taken = claimedByAnother(m, user?.id);
+            return (
+              <button
+                key={m.id}
+                class={`chip lg with-avatar ${taken ? 'taken' : ''}`}
+                disabled={busy || taken}
+                title={taken ? `${m.name} is signed in as this member` : undefined}
+                onClick={() => pick(m)}
+              >
+                <Avatar initials={personInitial(m.name)} color={colorForId(m.id)} size={30} src={api.memberPhotoUrl(m)} />
+                {m.name}
+                {m.user && <ClaimBadge />}
+              </button>
+            );
+          })}
         </div>
         <div class="divider">or add yourself</div>
         <div class="inline-add">
@@ -608,7 +713,9 @@ function JoinScreen({
         {error && <p class="error">{error}</p>}
       </section>
       <p class="hint sans">
-        No password, no account — picking a name just makes adding expenses quicker.
+        {user
+          ? `You're signed in as ${user.name || user.email} — tapping a name links it to your account.`
+          : 'No password, no account — picking a name just makes adding expenses quicker.'}
       </p>
     </div>
   );

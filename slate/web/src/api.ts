@@ -46,6 +46,13 @@ export interface MemberRecord {
   party_photo: string;
   /** kept only to resolve their name on old expenses; hidden from every picker */
   removed: boolean;
+  /**
+   * Claim (ADR-0005): id of the account this member is linked to; '' =
+   * unclaimed. Soft — a claimed member leaves everyone else's identity picker
+   * and nothing else. Server rules let only the signed-in account set or
+   * release it, to itself, one claim per account per group.
+   */
+  user: string;
 }
 
 /** Everything needed to render and re-edit a split, stored as JSON on the expense. */
@@ -272,6 +279,49 @@ export class DivvyApi {
     t: string,
   ): Promise<MemberRecord> {
     return this.pb.collection('members').update(memberId, data, { query: { t } });
+  }
+
+  // ── claims (ADR-0005) ──────────────────────────────────────────────────
+  // A claim is members.user pointing at the signed-in account. All three
+  // writers funnel the one-time photo copy through claimPhotoFixup: claiming
+  // a photo-less member stamps the profile photo onto it once — it's a plain
+  // member photo (group-editable) from then on.
+
+  /** Claim a member as the signed-in account. Fails if someone else holds it. */
+  async claimMember(member: MemberRecord, t: string): Promise<MemberRecord> {
+    const claimed: MemberRecord = await this.pb
+      .collection('members')
+      .update(member.id, { user: this.pb.authStore.record?.id }, { query: { t } });
+    return this.claimPhotoFixup(claimed, t);
+  }
+
+  /** Add a member already claimed as the signed-in account ("add yourself"). */
+  async addClaimedMember(groupId: string, name: string, t: string): Promise<MemberRecord> {
+    const claimed: MemberRecord = await this.pb
+      .collection('members')
+      .create({ group: groupId, name, user: this.pb.authStore.record?.id }, { query: { t } });
+    return this.claimPhotoFixup(claimed, t);
+  }
+
+  /** Release the signed-in account's claim on a member (claimant only). */
+  async releaseClaim(memberId: string, t: string): Promise<MemberRecord> {
+    return this.pb.collection('members').update(memberId, { user: '' }, { query: { t } });
+  }
+
+  /**
+   * The one-time photo copy on claim: a photo-less member gets the account's
+   * profile photo. Best-effort — a claim must not fail over a photo.
+   */
+  private async claimPhotoFixup(member: MemberRecord, t: string): Promise<MemberRecord> {
+    const u = this.user;
+    if (member.photo || !u?.avatar) return member;
+    try {
+      const res = await fetch(this.userPhotoUrl(u)!);
+      if (!res.ok) return member;
+      return await this.setMemberPhoto(member.id, await res.blob(), t);
+    } catch {
+      return member;
+    }
   }
 
   /**

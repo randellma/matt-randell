@@ -26,6 +26,17 @@ export function Avatar({ initials, color, size = 30, src, radius }: Props) {
   );
 }
 
+/** Tiny "signed in" seal worn by claimed members (ADR-0005). */
+export function ClaimBadge({ title = 'Signed in' }: { title?: string }) {
+  return (
+    <span class="claim-badge" title={title} aria-label={title}>
+      <svg viewBox="0 0 24 24" width="9" height="9" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12l5 5 11-11" />
+      </svg>
+    </span>
+  );
+}
+
 /** A row of overlapping avatars, capped with a "+N" badge for the overflow. */
 export function AvatarStack({
   people,

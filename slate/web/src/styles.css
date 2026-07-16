@@ -394,6 +394,17 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 .chip.ghost::before { content: '[ ]'; }
 .chip.ghost.on { color: #fff; }
 
+/* claimed members (ADR-0005): the tiny "signed in" seal, and the muted
+   un-tappable chip a member claimed by someone else becomes on the
+   identity picker — they're still everywhere else (paid-by, splits) */
+.claim-badge {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+}
+.chip.taken { opacity: 0.55; border-style: dashed; }
+.chip.taken::before { content: '[–]'; }
+
 /* split editors */
 .split-rows { display: flex; flex-direction: column; gap: 11px; }
 .split-row { display: flex; align-items: center; gap: 11px; }
