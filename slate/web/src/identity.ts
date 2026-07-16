@@ -1,7 +1,11 @@
 /**
  * Local identity: which groups this device has joined and who the user "is"
- * in each. Deliberately just localStorage — there are no accounts.
+ * in each. Deliberately just localStorage — a signed-in account's
+ * claim-derived groups merge in at render time (mergeGroups) and are never
+ * written here, so signing out drops exactly them and nothing else.
  */
+
+import type { ClaimedGroup } from './api';
 
 export interface JoinedGroup {
   id: string;
@@ -29,6 +33,27 @@ export function rememberGroup(group: JoinedGroup): void {
   const groups = listJoinedGroups().filter(g => g.id !== group.id);
   groups.unshift(group);
   localStorage.setItem(KEY, JSON.stringify(groups));
+}
+
+/**
+ * The Home list, signed in: locally-remembered groups first (their order and
+ * picked identities untouched), then claim-derived groups this device has
+ * never opened (ADR-0005). A group in both lists stays one row — the local
+ * entry, refreshed with the server's token and name, which are authoritative
+ * (a PIN toggle elsewhere rotates the token; a rename elsewhere changes the
+ * name). Opening a derived one remembers it locally like any shared link;
+ * until then it exists only in this merge, never in localStorage.
+ */
+export function mergeGroups(local: JoinedGroup[], claimed: ClaimedGroup[]): JoinedGroup[] {
+  const claimedById = new Map(claimed.map(g => [g.id, g]));
+  const localIds = new Set(local.map(g => g.id));
+  return [
+    ...local.map(g => {
+      const c = claimedById.get(g.id);
+      return c ? { ...g, t: c.t, name: c.name } : g;
+    }),
+    ...claimed.filter(g => !localIds.has(g.id)),
+  ];
 }
 
 export function forgetGroup(id: string): void {

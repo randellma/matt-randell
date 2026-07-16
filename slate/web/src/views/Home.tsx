@@ -8,7 +8,8 @@ import { Avatar } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 import { AccountSheet } from '../components/AccountSheet';
 import { useUser } from '../account';
-import { listJoinedGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
+import { listJoinedGroups, mergeGroups, newToken, parseGroupLink, rememberGroup, type JoinedGroup } from '../identity';
+import type { ClaimedGroup, UserRecord } from '../api';
 
 interface GroupSummary {
   memberCount: number;
@@ -65,12 +66,42 @@ function useGroupSummaries(groups: JoinedGroup[]): Record<string, GroupSummary> 
   return summaries;
 }
 
+/**
+ * Groups that follow the account: derived from its claims on the server
+ * (ADR-0005), fetched fresh per sign-in. Held only in memory — signing out
+ * empties this, which is exactly how derived groups leave Home while the
+ * locally-remembered ones stay.
+ */
+function useClaimedGroups(user: UserRecord | null): ClaimedGroup[] {
+  const [claimed, setClaimed] = useState<ClaimedGroup[]>([]);
+  useEffect(() => {
+    if (!user) {
+      setClaimed([]);
+      return;
+    }
+    let cancelled = false;
+    api.listClaimedGroups().then(
+      gs => {
+        if (!cancelled) setClaimed(gs);
+      },
+      () => {
+        /* offline or a dead session — Home just shows the local list */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+  return claimed;
+}
+
 export function Home() {
   const [creating, setCreating] = useState(false);
   const [opening, setOpening] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const user = useUser();
-  const groups = listJoinedGroups();
+  const claimed = useClaimedGroups(user);
+  const groups = mergeGroups(listJoinedGroups(), claimed);
   const summaries = useGroupSummaries(groups);
   // The scans row shows the live balance; scans spend credits without
   // touching the cached authStore record, so refresh it on the way in.

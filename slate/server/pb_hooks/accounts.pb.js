@@ -217,3 +217,36 @@ routerAdd('POST', '/api/divvy/credits/purchase', (e) => {
 
   return e.json(200, { granted: pack.credits, credits: me.getInt('credits') });
 });
+
+// ── Your groups: derived from claims (ADR-0005) ───────────────────────────
+
+// The groups that follow a signed-in account across devices — every group
+// where it holds a claim (members.user). Derived, never stored: a released
+// claim or a removed member drops out by construction, so the list can't
+// drift. Revealing the token to a claimant is safe — they necessarily held
+// it to claim, PIN-gated groups included.
+routerAdd('GET', '/api/divvy/account/groups', (e) => {
+  const me = e.auth && e.auth.collection().name === 'users' ? e.auth : null;
+  if (!me) {
+    return e.json(401, { code: 'signin_required', message: 'Sign in to see your groups.' });
+  }
+
+  const claims = e.app.findRecordsByFilter(
+    'members',
+    'user = {:me} && removed = false',
+    '-created',
+    0,
+    0,
+    { me: me.id },
+  );
+  const groups = [];
+  for (const m of claims) {
+    try {
+      const g = e.app.findRecordById('groups', m.getString('group'));
+      groups.push({ id: g.id, name: g.getString('name'), t: g.getString('t') });
+    } catch {
+      /* group gone under a dangling claim — nothing to follow */
+    }
+  }
+  return e.json(200, { groups });
+});
