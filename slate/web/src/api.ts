@@ -155,6 +155,16 @@ export interface ScanAllowance {
   sponsors: { user: string; name: string; credits: number }[];
 }
 
+/**
+ * One group that follows the signed-in account (ADR-0005): derived
+ * server-side from its claims, never stored as a list of its own.
+ */
+export interface ClaimedGroup {
+  id: string;
+  name: string;
+  t: string;
+}
+
 /** "This group may draw from my credits" — one row per sponsor per group. */
 export interface SponsorshipRecord {
   id: string;
@@ -595,6 +605,17 @@ export class DivvyApi {
     if (!id) return;
     const rec = await this.pb.collection('users').update(id, this.photoPayload('avatar', photo));
     this.pb.authStore.save(this.pb.authStore.token, rec);
+  }
+
+  /**
+   * The groups that follow the signed-in account: every group where it holds
+   * a claim (ADR-0005). Auth-gated — the server answers 401 signed out.
+   */
+  async listClaimedGroups(): Promise<ClaimedGroup[]> {
+    const res: { groups: ClaimedGroup[] } = await this.pb.send('/api/divvy/account/groups', {
+      method: 'GET',
+    });
+    return res.groups;
   }
 
   /** The signed-in account's credit ledger, newest first (list rule scopes it to the owner). */
