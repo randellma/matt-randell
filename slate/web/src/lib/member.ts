@@ -6,6 +6,16 @@ export function activeMembers(members: MemberRecord[]): MemberRecord[] {
 }
 
 /**
+ * Is this member claimed by an account other than `userId` (pass undefined
+ * when signed out)? Such members leave the identity picker — they're someone
+ * else, provably — but stay everywhere else (paid-by, splits, settle-up):
+ * claims are a social marker, not a security boundary (ADR-0005).
+ */
+export function claimedByAnother(m: MemberRecord, userId: string | undefined): boolean {
+  return !!m.user && m.user !== userId;
+}
+
+/**
  * Does any expense or payment point at this member? Scans every place a member
  * id can be stored — the payer relation and multi-payer entries, the split's
  * per-member entries plus its mode-specific state (percents, shares, item

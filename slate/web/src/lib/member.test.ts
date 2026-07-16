@@ -11,6 +11,7 @@ const member = (id: string, removed = false): MemberRecord => ({
   photo: '',
   party_photo: '',
   removed,
+  user: '',
 });
 
 const expense = (over: Partial<ExpenseRecord>): ExpenseRecord => ({

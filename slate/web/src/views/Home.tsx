@@ -230,9 +230,13 @@ function OpenGroup({ onCancel }: { onCancel: () => void }) {
 }
 
 function CreateGroup({ onCancel }: { onCancel: () => void }) {
+  const user = useUser();
   const [name, setName] = useState('');
   const [membersText, setMembersText] = useState('');
   const [myName, setMyName] = useState('');
+  // Signed in you're pre-added as a claimed member, named from your profile
+  // (ADR-0005) — the field starts filled, so usually there's nothing to type.
+  const [selfName, setSelfName] = useState(user?.name ?? '');
   // Group currency defaults to wherever this device seems to live.
   const [currency, setCurrency] = useState(detectCurrency);
   const [expenseCurrency, setExpenseCurrency] = useState('');
@@ -250,8 +254,12 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
 
   async function create() {
     if (!name.trim()) return setError('Give the group a name');
-    if (memberNames.length === 0) return setError('Add at least one member (you!)');
-    if (!myName) return setError('Pick which member is you');
+    if (user) {
+      if (!selfName.trim()) return setError('Add your name');
+    } else {
+      if (memberNames.length === 0) return setError('Add at least one member (you!)');
+      if (!myName) return setError('Pick which member is you');
+    }
     setBusy(true);
     setError('');
     try {
@@ -263,9 +271,18 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
         expenseCurrency === currency ? '' : expenseCurrency,
       );
       let myId: string | undefined;
-      for (const n of memberNames) {
-        const m = await api.addMember(group.id, n, token);
-        if (n === myName) myId = m.id;
+      if (user) {
+        // You first, born claimed — identity settled before anyone else's row.
+        const me = await api.addClaimedMember(group.id, selfName.trim(), token);
+        myId = me.id;
+        for (const n of memberNames.filter(n => n !== selfName.trim())) {
+          await api.addMember(group.id, n, token);
+        }
+      } else {
+        for (const n of memberNames) {
+          const m = await api.addMember(group.id, n, token);
+          if (n === myName) myId = m.id;
+        }
       }
       rememberGroup({ id: group.id, t: token, name: group.name, memberId: myId });
       navigate(groupPath(group.id, token));
@@ -286,13 +303,24 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
           placeholder="Beach trip 2026"
         />
       </label>
+      {user && (
+        <label class="field">
+          <span>You — joined &amp; linked to your account automatically</span>
+          <input
+            value={selfName}
+            maxLength={60}
+            placeholder="Your name"
+            onInput={e => setSelfName((e.target as HTMLInputElement).value)}
+          />
+        </label>
+      )}
       <label class="field">
-        <span>Members — one per line (you can always add more later)</span>
+        <span>{user ? 'Other members' : 'Members'} — one per line (you can always add more later)</span>
         <textarea
           rows={4}
           value={membersText}
           onInput={e => setMembersText((e.target as HTMLTextAreaElement).value)}
-          placeholder={'Matt\nSarah\nDad'}
+          placeholder={user ? 'Sarah\nDad' : 'Matt\nSarah\nDad'}
         />
       </label>
       <div class="field-row">
@@ -309,7 +337,7 @@ function CreateGroup({ onCancel }: { onCancel: () => void }) {
           />
         </label>
       </div>
-      {memberNames.length > 0 && (
+      {!user && memberNames.length > 0 && (
         <div class="field">
           <span>Which one is you?</span>
           <div class="chip-row wrap">

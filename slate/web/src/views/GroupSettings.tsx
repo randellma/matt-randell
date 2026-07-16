@@ -4,12 +4,12 @@ import type { ExpenseRecord, GroupRecord, MemberRecord, PaymentRecord, ScanAllow
 import { convertMinor, formatMoney } from '../lib/currency';
 import { fetchRate } from '../lib/fx';
 import { computeNets, expenseForBalance, paymentGroupCents, suggestSettlements } from '../lib/balances';
-import { activeMembers, memberReferenced } from '../lib/member';
+import { activeMembers, claimedByAnother, memberReferenced } from '../lib/member';
 import { prepareAvatarImage } from '../image';
 import { colorForId, collectiveInitials, GROUP_AVATAR_COLOR, personInitial } from '../lib/avatar';
 import { groupParties, partyDisplayName } from '../lib/party';
 import { forgetGroup, newToken } from '../identity';
-import { Avatar } from '../components/Avatar';
+import { Avatar, ClaimBadge } from '../components/Avatar';
 import { CurrencySelect } from '../components/CurrencySelect';
 import { PhotoInput } from '../components/PhotoInput';
 import { CreditsSheet } from '../components/CreditsSheet';
@@ -25,6 +25,8 @@ interface Props {
   me: string;
   /** the user tapped a different member as "you" — local identity only */
   onMeChange: (memberId: string) => void;
+  /** the signed-in account released its claim on this member */
+  onReleased: (updated: MemberRecord) => void;
   /** turning the PIN on rotated the group token — adopt the new one */
   onTokenRotated: (t: string) => void;
   /** back out, reloading group data if `changed` */
@@ -45,13 +47,17 @@ interface Props {
  * conversion at its own date: amounts stay in their original currencies; only
  * the group-level view moves.
  */
-export function GroupSettings({ group, token, members, expenses, payments, me, onMeChange, onTokenRotated, onDone }: Props) {
+export function GroupSettings({ group, token, members, expenses, payments, me, onMeChange, onReleased, onTokenRotated, onDone }: Props) {
   // Local copies so edits show up without leaving the page; the caller reloads
   // on the way out whenever anything was mutated.
   const [grp, setGrp] = useState(group);
   const [mems, setMems] = useState(members);
   const mutated = useRef(false);
   const confirm = useConfirm();
+  const user = useUser();
+  // Signed in with a claim here, identity is pinned to the claimed member —
+  // "wherever you hold a claim you are that member" (ADR-0005).
+  const myClaim = user ? mems.find(m => !m.removed && m.user === user.id) : undefined;
 
   const [tab, setTab] = useState<'group' | 'people'>('group');
   // The "✓ Saved" badge: flashSaved() shows it, then fades it after ~1.5s. A
@@ -233,6 +239,37 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
     return failures;
   }
 
+  /**
+   * Release a claim — the mis-tap escape hatch (ADR-0005). Only the linked
+   * account can do this (server-enforced too). The member keeps their name,
+   * photo, and history; the parent clears this device's identity and shows
+   * the "who are you?" picker, which also retracts the assertion behind the
+   * open-the-group auto-claim (so it can't silently re-link).
+   */
+  async function releaseClaim(m: MemberRecord) {
+    if (!user || m.user !== user.id) return;
+    if (
+      !(await confirm({
+        title: `Unlink ${m.name} from your account?`,
+        message:
+          `${m.name} stays in the group with all their history — this only ` +
+          'removes the signed-in link. You’ll be asked who you are next time ' +
+          'you open the group.',
+        confirmLabel: 'Unlink',
+      }))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      onReleased(await api.releaseClaim(m.id, token));
+    } catch (e) {
+      setError(String(e));
+      setBusy(false);
+    }
+  }
+
   /** Just forget the group locally — the link still works if it resurfaces. */
   function removeFromDevice() {
     forgetGroup(grp.id);
@@ -376,24 +413,32 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
           <div class="stack-sm">
             <div class="seclbl left">You on this device</div>
             <p class="hint sans left">
-              Pick who you are so “paid by” defaults to you — switch any time.
+              {myClaim
+                ? `You're signed in as ${myClaim.name} — that's you wherever you're signed in. To switch, unlink them below.`
+                : 'Pick who you are so “paid by” defaults to you — switch any time.'}
             </p>
             <div class="chip-row wrap">
-              {activeMembers(mems).map(m => (
-                <button
-                  key={m.id}
-                  class={`chip with-avatar ${m.id === me ? 'on' : ''}`}
-                  onClick={() => onMeChange(m.id)}
-                >
-                  <Avatar
-                    initials={personInitial(m.name)}
-                    color={colorForId(m.id)}
-                    size={24}
-                    src={api.memberPhotoUrl(m)}
-                  />
-                  {m.name}
-                </button>
-              ))}
+              {activeMembers(mems).map(m => {
+                const taken = claimedByAnother(m, user?.id);
+                return (
+                  <button
+                    key={m.id}
+                    class={`chip with-avatar ${m.id === me ? 'on' : ''} ${taken ? 'taken' : ''}`}
+                    disabled={taken || (!!myClaim && m.id !== myClaim.id)}
+                    title={taken ? `${m.name} is signed in as this member` : undefined}
+                    onClick={() => onMeChange(m.id)}
+                  >
+                    <Avatar
+                      initials={personInitial(m.name)}
+                      color={colorForId(m.id)}
+                      size={24}
+                      src={api.memberPhotoUrl(m)}
+                    />
+                    {m.name}
+                    {m.user && <ClaimBadge />}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <hr class="rule" />
@@ -403,6 +448,8 @@ export function GroupSettings({ group, token, members, expenses, payments, me, o
             groupId={grp.id}
             token={token}
             me={me}
+            userId={user?.id}
+            onRelease={releaseClaim}
             busy={busy}
             groupCurrency={groupCurrency}
             netOf={id => nets.get(id) ?? 0}
@@ -440,6 +487,8 @@ function MemberEditor({
   groupId,
   token,
   me,
+  userId,
+  onRelease,
   busy,
   groupCurrency,
   netOf,
@@ -455,6 +504,9 @@ function MemberEditor({
   groupId: string;
   token: string;
   me: string;
+  /** the signed-in account id, for the release-claim control (claimant only) */
+  userId: string | undefined;
+  onRelease: (m: MemberRecord) => void;
   busy: boolean;
   groupCurrency: string;
   netOf: (id: string) => number;
@@ -612,7 +664,9 @@ function MemberEditor({
             />
           </PhotoInput>
           <button class="party-name" title="Rename" onClick={() => setRenaming(m)}>
-            <span>{m.name} ✏️</span>
+            <span>
+              {m.name} ✏️ {m.user && <ClaimBadge />}
+            </span>
           </button>
           {m.photo ? (
             <button class="item-remove" disabled={busy} title="Remove photo" onClick={() => clearPhoto(m)}>
@@ -622,6 +676,11 @@ function MemberEditor({
             <PhotoInput class="btn small" busy={busy} onPick={f => pickPhoto(m, f)}>
               Add photo
             </PhotoInput>
+          )}
+          {userId && m.user === userId && (
+            <button class="btn small" disabled={busy} title="Remove the link to your account" onClick={() => onRelease(m)}>
+              Unlink
+            </button>
           )}
           {m.id === me ? (
             <span class="hint sans" title="Switch who you are to remove yourself">

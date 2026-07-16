@@ -1,7 +1,7 @@
 # Slate: Claims — members link to accounts
 
 **Type**: AFK
-**Status**: ready-for-agent
+**Status**: complete
 **Blocked by**: none
 
 ## What to build
@@ -20,14 +20,14 @@ Claiming never renames the member; claiming a photo-less member copies the profi
 
 ## Acceptance criteria
 
-- [ ] `members` gains an account link with server rules: only the signed-in account can set/release it to itself, one claim per account per group; a working down-migration
-- [ ] Signed in on the join screen: tapping an unclaimed member claims + identifies in one tap; others' claimed members are badged and un-tappable; "add yourself" creates an already-claimed member prefilled from the profile name
-- [ ] Holding a claim in a group skips the join screen and auto-identifies on any signed-in device
-- [ ] Creating a group while signed in pre-adds you claimed and identified, named from your profile
-- [ ] Opening a group with an existing local identity while signed in auto-claims that member; falls back to the picker if it's already claimed by another account
-- [ ] Claiming never changes the member's name; a photo-less member gets the profile photo copied once
-- [ ] The linked account can release its claim from the member screen; nobody else can
-- [ ] Paid-by/split pickers still list claimed members; signed-out behavior is unchanged everywhere
+- [x] `members` gains an account link with server rules: only the signed-in account can set/release it to itself, one claim per account per group; a working down-migration
+- [x] Signed in on the join screen: tapping an unclaimed member claims + identifies in one tap; others' claimed members are badged and un-tappable; "add yourself" creates an already-claimed member prefilled from the profile name
+- [x] Holding a claim in a group skips the join screen and auto-identifies on any signed-in device
+- [x] Creating a group while signed in pre-adds you claimed and identified, named from your profile
+- [x] Opening a group with an existing local identity while signed in auto-claims that member; falls back to the picker if it's already claimed by another account
+- [x] Claiming never changes the member's name; a photo-less member gets the profile photo copied once
+- [x] The linked account can release its claim from the member screen; nobody else can
+- [x] Paid-by/split pickers still list claimed members; signed-out behavior is unchanged everywhere
 
 ## Blocked by
 
