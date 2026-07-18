@@ -5,7 +5,8 @@
 #   gcloud auth login
 #
 # Usage:
-#   ansible-playbook homeserver/setup.yml -i 192.168.2.109, -u <ssh-user> --ask-become-pass
+#   ansible-playbook homeserver/setup.yml -i mrandell-MINI-S.local, -u <ssh-user> --ask-become-pass
+#   (uses the server's mDNS hostname so it survives router/DHCP changes; no hardcoded IP)
 - name: Bootstrap home server
   hosts: all
   become: true
