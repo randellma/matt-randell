@@ -209,6 +209,19 @@ resource "cloudflare_dns_record" "inventory_api" {
   }
 }
 
+resource "cloudflare_dns_record" "life_points_api" {
+  content = "e75d6d99-e765-434a-a8a6-6619f821ccba.cfargotunnel.com"
+  name    = "lifepoints-api.mattrandell.com"
+  proxied = true
+  tags    = []
+  ttl     = 1
+  type    = "CNAME"
+  zone_id = "cb009dc3da4929bf68ef21b73d4552f1"
+  settings = {
+    flatten_cname = false
+  }
+}
+
 resource "cloudflare_dns_record" "divvy_api" {
   content = "e75d6d99-e765-434a-a8a6-6619f821ccba.cfargotunnel.com"
   name    = "divvy-api.mattrandell.com"
@@ -307,5 +320,4 @@ resource "cloudflare_ruleset" "divvy_to_slate_redirect" {
     }
   ]
 }
-
 

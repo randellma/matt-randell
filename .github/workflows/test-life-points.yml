@@ -1,4 +1,4 @@
-name: Test Life Points
+name: Test and Deploy Life Points
 
 on:
   pull_request:
@@ -15,6 +15,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     defaults:
       run:
         working-directory: life-points
@@ -27,5 +30,23 @@ jobs:
           cache-dependency-path: life-points/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npm test
+      - name: Acceptance test
+        run: npm test
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_POCKETBASE_URL: https://lifepoints-api.mattrandell.com
+      - name: Deploy to Cloudflare Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: npx wrangler pages deploy dist --project-name life-points-mattrandell --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 894ff489298bdf1ca445fc9469854b25
+      - name: Production smoke test
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            https://lifepoints.mattrandell.com >/dev/null
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            https://lifepoints-api.mattrandell.com/api/life-points/v1/health \
+            | grep --fixed-strings '"status":"healthy"'

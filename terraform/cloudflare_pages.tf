@@ -23,6 +23,30 @@ resource "cloudflare_dns_record" "inventory" {
   settings = {}
 }
 
+resource "cloudflare_pages_project" "life_points" {
+  account_id        = "894ff489298bdf1ca445fc9469854b25"
+  name              = "life-points-mattrandell"
+  production_branch = "main"
+}
+
+# Binds lifepoints.mattrandell.com as the isolated origin for the Life Points PWA.
+resource "cloudflare_pages_domain" "life_points" {
+  account_id   = "894ff489298bdf1ca445fc9469854b25"
+  project_name = cloudflare_pages_project.life_points.name
+  name         = "lifepoints.mattrandell.com"
+}
+
+resource "cloudflare_dns_record" "life_points" {
+  zone_id  = "cb009dc3da4929bf68ef21b73d4552f1"
+  name     = "lifepoints.mattrandell.com"
+  type     = "CNAME"
+  content  = "${cloudflare_pages_project.life_points.name}.pages.dev"
+  proxied  = true
+  ttl      = 1
+  tags     = []
+  settings = {}
+}
+
 resource "cloudflare_pages_project" "divvy" {
   account_id        = "894ff489298bdf1ca445fc9469854b25"
   name              = "divvy-mattrandell"
