@@ -1,17 +1,26 @@
-# Issue tracker: Local Markdown
+# Issue tracker: GitHub
 
-Issues for this repo live as markdown files in `docs/issues/`.
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
 ## Conventions
 
-- Issues are numbered sequentially: `docs/issues/<NNNN>-<slug>.md`, starting from `0001`
-- Triage state is recorded as a `**Status:**` line near the top of each issue file (see `triage-labels.md` for role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- **Create an issue**: `gh issue create --title "..." --body "..."`
+- **Read an issue**: `gh issue view <number> --comments`, including labels.
+- **List issues**: `gh issue list` with appropriate state and label filters.
+- **Comment on an issue**: `gh issue comment <number> --body "..."`
+- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
+- **Close**: `gh issue close <number> --comment "..."`
+
+Infer the repository from `git remote -v`; `gh` does this automatically inside this clone.
+
+## Pull requests as a triage surface
+
+**PRs as a request surface: no.**
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `docs/issues/` using the next sequential number.
+Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at the referenced path. The user will normally pass the path or issue number directly.
+Run `gh issue view <number> --comments`.
