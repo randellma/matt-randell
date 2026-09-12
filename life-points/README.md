@@ -41,3 +41,19 @@ npm test
 `npm test` selects available host ports, starts the complete stack under an isolated Compose
 project, waits for both services, runs the mobile Chromium welcome-to-health journey, and always
 removes its containers and volumes.
+
+## Production hosting
+
+The frontend is deployed to Cloudflare Pages at <https://lifepoints.mattrandell.com>. Its
+production build calls PocketBase at <https://lifepoints-api.mattrandell.com>. Pages, both DNS
+records, and the shared Cloudflare Tunnel ingress are managed in `/terraform`.
+
+After the one-time Infrastructure and Coolify setup, pushes to `main` that touch `life-points/**`
+run the isolated acceptance test, build with the production API URL, and deploy `dist` to the
+`life-points-mattrandell` Pages project. Pull requests run the same tests and build without
+deploying.
+
+The PocketBase Coolify application builds from `/life-points/backend/Dockerfile`, exposes port
+`8090`, sets `LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com`, and persists
+`/pb/pb_data` in a named volume. Persistent storage must have an off-server backup before Account
+or Game data is introduced.
