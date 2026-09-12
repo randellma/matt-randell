@@ -1,6 +1,7 @@
 :root {
+  --viewport-edge: #f7a8be;
   color: #55233a;
-  background: #f7a8be;
+  background: var(--viewport-edge);
   font-family: ui-rounded, 'Avenir Next', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -33,6 +34,13 @@ button {
   overflow: hidden;
   padding: 32px 20px 22px;
   background:
+    linear-gradient(
+      to bottom,
+      var(--viewport-edge) 0%,
+      transparent 8%,
+      transparent 92%,
+      var(--viewport-edge) 100%
+    ),
     radial-gradient(circle at 12% 14%, rgb(255 236 220 / 56%) 0 7%, transparent 7.2%),
     radial-gradient(circle at 91% 75%, rgb(195 67 110 / 16%) 0 13%, transparent 13.2%),
     linear-gradient(152deg, #fac0cd 0%, #f5a5bc 52%, #ed8ead 100%);
@@ -169,6 +177,13 @@ button:focus-visible {
   place-items: center;
   padding: 24px 18px;
   background:
+    linear-gradient(
+      to bottom,
+      var(--viewport-edge) 0%,
+      transparent 8%,
+      transparent 92%,
+      var(--viewport-edge) 100%
+    ),
     radial-gradient(circle at 15% 12%, rgb(255 255 255 / 50%) 0 8%, transparent 8.2%),
     linear-gradient(152deg, #fac0cd 0%, #ed8ead 100%);
 }
