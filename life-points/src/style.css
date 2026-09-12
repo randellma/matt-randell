@@ -34,16 +34,9 @@ button {
   overflow: hidden;
   padding: 32px 20px 22px;
   background:
-    linear-gradient(
-      to bottom,
-      var(--viewport-edge) 0%,
-      transparent 8%,
-      transparent 92%,
-      var(--viewport-edge) 100%
-    ),
     radial-gradient(circle at 12% 14%, rgb(255 236 220 / 56%) 0 7%, transparent 7.2%),
     radial-gradient(circle at 91% 75%, rgb(195 67 110 / 16%) 0 13%, transparent 13.2%),
-    linear-gradient(152deg, #fac0cd 0%, #f5a5bc 52%, #ed8ead 100%);
+    var(--viewport-edge);
 }
 
 .welcome-card {
@@ -53,10 +46,8 @@ button {
   padding: 44px 30px 34px;
   border: 1px solid rgb(255 255 255 / 62%);
   border-radius: 34px;
-  background: rgb(255 248 240 / 91%);
-  box-shadow: 0 28px 80px rgb(116 34 68 / 24%);
+  background: #fff8f0;
   text-align: center;
-  backdrop-filter: blur(12px);
 }
 
 .brand-mark {
@@ -177,15 +168,8 @@ button:focus-visible {
   place-items: center;
   padding: 24px 18px;
   background:
-    linear-gradient(
-      to bottom,
-      var(--viewport-edge) 0%,
-      transparent 8%,
-      transparent 92%,
-      var(--viewport-edge) 100%
-    ),
     radial-gradient(circle at 15% 12%, rgb(255 255 255 / 50%) 0 8%, transparent 8.2%),
-    linear-gradient(152deg, #fac0cd 0%, #ed8ead 100%);
+    var(--viewport-edge);
 }
 
 .entry-card,
@@ -358,12 +342,6 @@ button:focus-visible {
   height: 78px;
   border-radius: 100% 0 100% 0;
   background: rgb(85 124 80 / 26%);
-}
-
-.leaf-one {
-  bottom: 2%;
-  left: -70px;
-  transform: rotate(31deg);
 }
 
 .leaf-two {
