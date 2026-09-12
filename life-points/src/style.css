@@ -1,0 +1,237 @@
+:root {
+  color: #55233a;
+  background: #f7a8be;
+  font-family: ui-rounded, 'Avenir Next', system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.welcome-shell {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  padding: 32px 20px 22px;
+  background:
+    radial-gradient(circle at 12% 14%, rgb(255 236 220 / 56%) 0 7%, transparent 7.2%),
+    radial-gradient(circle at 91% 75%, rgb(195 67 110 / 16%) 0 13%, transparent 13.2%),
+    linear-gradient(152deg, #fac0cd 0%, #f5a5bc 52%, #ed8ead 100%);
+}
+
+.welcome-card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 460px);
+  padding: 44px 30px 34px;
+  border: 1px solid rgb(255 255 255 / 62%);
+  border-radius: 34px;
+  background: rgb(255 248 240 / 91%);
+  box-shadow: 0 28px 80px rgb(116 34 68 / 24%);
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+
+.brand-mark {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 20px;
+  transform: rotate(8deg);
+}
+
+.petal,
+.flower-center {
+  position: absolute;
+  display: block;
+  left: 50%;
+  top: 50%;
+}
+
+.petal {
+  width: 26px;
+  height: 38px;
+  margin: -34px 0 0 -13px;
+  border-radius: 70% 30% 65% 35%;
+  background: #d74978;
+  transform-origin: 50% 34px;
+}
+
+.petal-two { transform: rotate(90deg); }
+.petal-three { transform: rotate(180deg); }
+.petal-four { transform: rotate(270deg); }
+
+.flower-center {
+  width: 23px;
+  height: 23px;
+  margin: -11.5px 0 0 -11.5px;
+  border: 5px solid #fff4df;
+  border-radius: 50%;
+  background: #e6ae46;
+  box-shadow: 0 2px 7px rgb(111 54 15 / 20%);
+}
+
+.eyebrow {
+  margin: 0 0 9px;
+  color: #b62f61;
+  font-size: 0.79rem;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 390px;
+  margin: 0 auto;
+  color: #60243c;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2.65rem, 12vw, 4.1rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.promise {
+  max-width: 350px;
+  margin: 24px auto 0;
+  color: #79485c;
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.gentle-note {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 28px;
+  padding: 17px 18px;
+  border: 1px solid #ebd8bc;
+  border-radius: 20px;
+  background: #fff6e8;
+  text-align: left;
+}
+
+.gentle-note strong,
+.gentle-note span:not(.sparkle) {
+  display: block;
+}
+
+.gentle-note strong {
+  margin-bottom: 4px;
+  color: #78334c;
+  font-size: 0.93rem;
+}
+
+.gentle-note span:not(.sparkle) {
+  color: #8e6170;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.sparkle {
+  color: #d59d34;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.readiness {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 23px;
+  color: #83566a;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.readiness-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dcad50;
+  box-shadow: 0 0 0 4px rgb(220 173 80 / 16%);
+}
+
+.readiness[data-state='ready'] .readiness-dot {
+  background: #6f956a;
+  box-shadow: 0 0 0 4px rgb(111 149 106 / 16%);
+}
+
+.footer-note {
+  position: absolute;
+  z-index: 2;
+  bottom: 10px;
+  margin: 0;
+  color: rgb(91 31 56 / 66%);
+  font-family: Georgia, serif;
+  font-size: 0.76rem;
+  font-style: italic;
+}
+
+.sun-glow {
+  position: absolute;
+  top: -100px;
+  right: -90px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: rgb(255 238 187 / 40%);
+  filter: blur(4px);
+}
+
+.leaf {
+  position: absolute;
+  width: 170px;
+  height: 78px;
+  border-radius: 100% 0 100% 0;
+  background: rgb(85 124 80 / 26%);
+}
+
+.leaf-one {
+  bottom: 2%;
+  left: -70px;
+  transform: rotate(31deg);
+}
+
+.leaf-two {
+  top: 18%;
+  right: -105px;
+  transform: rotate(205deg) scale(1.25);
+}
+
+@media (max-width: 420px) {
+  .welcome-shell {
+    padding-inline: 14px;
+  }
+
+  .welcome-card {
+    padding: 38px 22px 30px;
+    border-radius: 29px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-mark {
+    animation: settle 700ms ease-out both;
+  }
+
+  @keyframes settle {
+    from { opacity: 0; transform: translateY(-10px) rotate(-8deg); }
+    to { opacity: 1; transform: translateY(0) rotate(8deg); }
+  }
+}

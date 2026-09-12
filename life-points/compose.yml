@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        POCKETBASE_VERSION: 0.40.4
+    ports:
+      - "${LIFE_POINTS_API_PORT:-8090}:8090"
+    volumes:
+      - backend-data:/pb/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--output-document=-", "http://127.0.0.1:8090/api/life-points/v1/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
+
+  frontend:
+    image: node:22.21.1-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    environment:
+      VITE_POCKETBASE_URL: "${LIFE_POINTS_API_URL:-http://127.0.0.1:8090}"
+    ports:
+      - "${LIFE_POINTS_WEB_PORT:-4173}:4173"
+    volumes:
+      - .:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:4173"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 8s
+
+volumes:
+  backend-data:
+  frontend-node-modules:
