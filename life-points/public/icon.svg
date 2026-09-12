@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Life Points flower">
+  <rect width="512" height="512" rx="112" fill="#f7a8be"/>
+  <g transform="translate(256 256)">
+    <ellipse rx="62" ry="132" transform="rotate(0) translate(0 -82)" fill="#c9366b"/>
+    <ellipse rx="62" ry="132" transform="rotate(72) translate(0 -82)" fill="#d94a7c"/>
+    <ellipse rx="62" ry="132" transform="rotate(144) translate(0 -82)" fill="#bd2f62"/>
+    <ellipse rx="62" ry="132" transform="rotate(216) translate(0 -82)" fill="#d94a7c"/>
+    <ellipse rx="62" ry="132" transform="rotate(288) translate(0 -82)" fill="#c9366b"/>
+    <circle r="62" fill="#fff4df"/>
+    <circle r="38" fill="#e6ae46"/>
+  </g>
+</svg>

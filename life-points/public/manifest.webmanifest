@@ -1,0 +1,17 @@
+{
+  "name": "Life Points",
+  "short_name": "Life Points",
+  "description": "A gentle game for celebrating a richer, more varied life.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff8f0",
+  "theme_color": "#f7a8be",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
