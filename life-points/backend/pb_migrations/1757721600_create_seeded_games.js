@@ -1,12 +1,10 @@
-const ownerName = $os.getenv('LIFE_POINTS_OWNER_NAME') || 'Ysabel';
-
 const SEEDED_GAMES = [
   {
     accountId: 'acctysabel00001',
-    email: $os.getenv('LIFE_POINTS_OWNER_EMAIL') || 'ysabel@example.test',
+    email: 'ysabel08@gmail.com',
     gameId: 'gameysabel00001',
-    playerName: ownerName,
-    title: $os.getenv('LIFE_POINTS_GAME_TITLE') || `${ownerName}'s Life Points`,
+    playerName: 'Ysabel',
+    title: "Ysabel's Life Points",
   },
   {
     accountId: 'acctfriend00001',

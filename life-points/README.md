@@ -24,7 +24,7 @@ Mailpit at <http://127.0.0.1:8025>.
 
 The versioned development seed provides two isolated Game Owners:
 
-- `ysabel@example.test` — Ysabel, owner of `Ysabel's Life Points`;
+- `ysabel08@gmail.com` — Ysabel, owner of `Ysabel's Life Points`;
 - `friend@example.test` — Rowan, owner of `Rowan's Life Points`.
 
 The web, API, and mail ports can be changed without editing files:
@@ -73,26 +73,17 @@ storage has an off-server backup and production SMTP is configured.
 
 ### Production email and seeded Game Owner
 
-Life Points uses PocketBase's native OTP mailer. Local Compose points it at Mailpit; production
-points the same mailer at Resend's SMTP service. Configure these environment variables on the
-Life Points backend in Coolify before its first production deployment:
+Life Points uses PocketBase's native OTP flow. Local Compose delivers through Mailpit;
+production's OTP mail hook delivers through Resend's HTTP API, matching HeySlate. Configure these
+environment variables on the Life Points backend in Coolify before its first production deploy:
 
 ```text
 LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com
 LIFE_POINTS_WEB_URL=https://lifepoints.mattrandell.com
-LIFE_POINTS_EMAIL_FROM_NAME=Life Points
-LIFE_POINTS_EMAIL_FROM=hello@heyslate.app
-LIFE_POINTS_SMTP_HOST=smtp.resend.com
-LIFE_POINTS_SMTP_PORT=465
-LIFE_POINTS_SMTP_USERNAME=resend
-LIFE_POINTS_SMTP_PASSWORD=<Life Points sending-only Resend API key>
-LIFE_POINTS_SMTP_TLS=true
-LIFE_POINTS_OWNER_EMAIL=<Game Owner's real email address>
-LIFE_POINTS_OWNER_NAME=Ysabel
-LIFE_POINTS_GAME_TITLE=Ysabel's Life Points
+RESEND_API_KEY=<Life Points sending-only Resend API key>
 ```
 
 Create a dedicated Resend API key with sending-only access to the already verified
-`heyslate.app` domain. Do not commit the key. The boot hook reapplies mail configuration, the
-public magic-link origin, and an explicitly configured Owner email on every restart, so changing
-these Coolify values does not require editing the PocketBase Dashboard.
+`heyslate.app` domain. Do not commit the key. The seeded Game Owner is intentionally fixed in the
+migration as `ysabel08@gmail.com`, with Player Name `Ysabel` and Game title
+`Ysabel's Life Points`.
