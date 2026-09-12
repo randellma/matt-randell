@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { PNG } from 'pngjs';
 
 const apiUrl = process.env.LIFE_POINTS_API_URL ?? 'http://127.0.0.1:8090';
 const mailUrl = process.env.LIFE_POINTS_MAIL_URL ?? 'http://127.0.0.1:8025';
@@ -16,6 +17,39 @@ type AuthData = {
     playerName: string;
   };
 };
+
+async function expectViewportEdgesToMatchTheme(page: Page): Promise<void> {
+  const themeColor = await page.locator('meta[name="theme-color"]').getAttribute('content');
+  expect(themeColor).toMatch(/^#[0-9a-f]{6}$/i);
+
+  const theme = [1, 3, 5].map((offset) =>
+    Number.parseInt(themeColor!.slice(offset, offset + 2), 16),
+  );
+  const screenshot = PNG.sync.read(await page.screenshot());
+  const edgeColor = (y: number): number[] => {
+    const start = Math.floor(screenshot.width * 0.4);
+    const end = Math.ceil(screenshot.width * 0.6);
+    const totals = [0, 0, 0];
+    for (let x = start; x < end; x += 1) {
+      const pixel = (screenshot.width * y + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        totals[channel] += screenshot.data[pixel + channel];
+      }
+    }
+    return totals.map((total) => Math.round(total / (end - start)));
+  };
+  const difference = (color: number[]): number =>
+    Math.max(...color.map((channel, index) => Math.abs(channel - theme[index])));
+
+  expect(
+    difference(edgeColor(0)),
+    'top viewport edge should blend into Safari chrome',
+  ).toBeLessThanOrEqual(5);
+  expect(
+    difference(edgeColor(screenshot.height - 1)),
+    'bottom viewport edge should blend into Safari chrome',
+  ).toBeLessThanOrEqual(5);
+}
 
 async function waitForOtp(email: string, expectedOtpId: string): Promise<CapturedOtp> {
   const deadline = Date.now() + 10_000;
@@ -102,6 +136,7 @@ test('Game Owner enters with either OTP credential and keeps control of local ac
   await page.getByRole('button', { name: 'Enter my Game' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome, Ysabel' })).toBeVisible();
   await expect(page.getByText("Ysabel's Life Points")).toBeVisible();
+  await expectViewportEdgesToMatchTheme(page);
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Welcome, Ysabel' })).toBeVisible();
