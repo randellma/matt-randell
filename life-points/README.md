@@ -70,3 +70,29 @@ The PocketBase Coolify application builds from `/life-points/backend/Dockerfile`
 `8090`, sets `LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com`, and persists
 `/pb/pb_data` in a named volume. Deploy the Account and Game migration only after persistent
 storage has an off-server backup and production SMTP is configured.
+
+### Production email and seeded Game Owner
+
+Life Points uses PocketBase's native OTP mailer. Local Compose points it at Mailpit; production
+points the same mailer at Resend's SMTP service. Configure these environment variables on the
+Life Points backend in Coolify before its first production deployment:
+
+```text
+LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com
+LIFE_POINTS_WEB_URL=https://lifepoints.mattrandell.com
+LIFE_POINTS_EMAIL_FROM_NAME=Life Points
+LIFE_POINTS_EMAIL_FROM=hello@heyslate.app
+LIFE_POINTS_SMTP_HOST=smtp.resend.com
+LIFE_POINTS_SMTP_PORT=465
+LIFE_POINTS_SMTP_USERNAME=resend
+LIFE_POINTS_SMTP_PASSWORD=<Life Points sending-only Resend API key>
+LIFE_POINTS_SMTP_TLS=true
+LIFE_POINTS_OWNER_EMAIL=<Game Owner's real email address>
+LIFE_POINTS_OWNER_NAME=Ysabel
+LIFE_POINTS_GAME_TITLE=Ysabel's Life Points
+```
+
+Create a dedicated Resend API key with sending-only access to the already verified
+`heyslate.app` domain. Do not commit the key. The boot hook reapplies mail configuration, the
+public magic-link origin, and an explicitly configured Owner email on every restart, so changing
+these Coolify values does not require editing the PocketBase Dashboard.

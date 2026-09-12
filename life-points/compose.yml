@@ -18,8 +18,16 @@ services:
       - "${LIFE_POINTS_API_PORT:-8090}:8090"
     environment:
       LIFE_POINTS_PUBLIC_URL: "${LIFE_POINTS_API_URL:-http://127.0.0.1:8090}"
+      LIFE_POINTS_EMAIL_FROM: hello@lifepoints.test
+      LIFE_POINTS_EMAIL_FROM_NAME: Life Points
+      LIFE_POINTS_GAME_TITLE: "${LIFE_POINTS_GAME_TITLE:-}"
+      LIFE_POINTS_OWNER_EMAIL: "${LIFE_POINTS_OWNER_EMAIL:-}"
+      LIFE_POINTS_OWNER_NAME: "${LIFE_POINTS_OWNER_NAME:-}"
       LIFE_POINTS_SMTP_HOST: mail
+      LIFE_POINTS_SMTP_PASSWORD: ""
       LIFE_POINTS_SMTP_PORT: 1025
+      LIFE_POINTS_SMTP_TLS: "false"
+      LIFE_POINTS_SMTP_USERNAME: ""
       LIFE_POINTS_WEB_URL: "${LIFE_POINTS_WEB_URL:-http://127.0.0.1:4173}"
     volumes:
       - backend-data:/pb/pb_data

@@ -1,10 +1,12 @@
+const ownerName = $os.getenv('LIFE_POINTS_OWNER_NAME') || 'Ysabel';
+
 const SEEDED_GAMES = [
   {
     accountId: 'acctysabel00001',
-    email: 'ysabel@example.test',
+    email: $os.getenv('LIFE_POINTS_OWNER_EMAIL') || 'ysabel@example.test',
     gameId: 'gameysabel00001',
-    playerName: 'Ysabel',
-    title: "Ysabel's Life Points",
+    playerName: ownerName,
+    title: $os.getenv('LIFE_POINTS_GAME_TITLE') || `${ownerName}'s Life Points`,
   },
   {
     accountId: 'acctfriend00001',
@@ -17,15 +19,6 @@ const SEEDED_GAMES = [
 
 migrate(
   (app) => {
-    const settings = app.settings();
-    settings.meta.senderName = 'Life Points';
-    settings.meta.senderAddress = 'hello@lifepoints.test';
-    settings.smtp.enabled = Boolean($os.getenv('LIFE_POINTS_SMTP_HOST'));
-    settings.smtp.host = $os.getenv('LIFE_POINTS_SMTP_HOST');
-    settings.smtp.port = Number($os.getenv('LIFE_POINTS_SMTP_PORT') || '1025');
-    settings.smtp.tls = false;
-    app.save(settings);
-
     const games = new Collection({
       type: 'base',
       name: 'games',
