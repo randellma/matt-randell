@@ -54,3 +54,19 @@ project, waits for all services, and runs the mobile Chromium journeys. The test
 OTP credentials from Mailpit, cover code and magic-link entry, session restoration and sign-out,
 and attempt cross-Game record mutations and protected-file reads. The runner always removes its
 containers and volumes.
+
+## Production hosting
+
+The frontend is deployed to Cloudflare Pages at <https://lifepoints.mattrandell.com>. Its
+production build calls PocketBase at <https://lifepoints-api.mattrandell.com>. Pages, both DNS
+records, and the shared Cloudflare Tunnel ingress are managed in `/terraform`.
+
+After the one-time Infrastructure and Coolify setup, pushes to `main` that touch `life-points/**`
+run the isolated acceptance test, build with the production API URL, and deploy `dist` to the
+`life-points-mattrandell` Pages project. Pull requests run the same tests and build without
+deploying.
+
+The PocketBase Coolify application builds from `/life-points/backend/Dockerfile`, exposes port
+`8090`, sets `LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com`, and persists
+`/pb/pb_data` in a named volume. Deploy the Account and Game migration only after persistent
+storage has an off-server backup and production SMTP is configured.
