@@ -3,12 +3,18 @@ import { createServer } from 'node:net';
 import process from 'node:process';
 
 const projectName = `life-points-acceptance-${process.pid}`;
-const [apiPort, webPort] = await Promise.all([findAvailablePort(), findAvailablePort()]);
+const [apiPort, mailPort, webPort] = await Promise.all([
+  findAvailablePort(),
+  findAvailablePort(),
+  findAvailablePort(),
+]);
 const environment = {
   ...process.env,
   COMPOSE_PROJECT_NAME: projectName,
   LIFE_POINTS_API_PORT: apiPort,
   LIFE_POINTS_API_URL: `http://127.0.0.1:${apiPort}`,
+  LIFE_POINTS_MAIL_PORT: mailPort,
+  LIFE_POINTS_MAIL_URL: `http://127.0.0.1:${mailPort}`,
   LIFE_POINTS_WEB_PORT: webPort,
   LIFE_POINTS_WEB_URL: `http://127.0.0.1:${webPort}`,
 };

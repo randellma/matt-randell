@@ -1,4 +1,14 @@
 services:
+  mail:
+    image: axllent/mailpit:v1.31.1
+    ports:
+      - "${LIFE_POINTS_MAIL_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
   backend:
     build:
       context: ./backend
@@ -6,6 +16,11 @@ services:
         POCKETBASE_VERSION: 0.40.4
     ports:
       - "${LIFE_POINTS_API_PORT:-8090}:8090"
+    environment:
+      LIFE_POINTS_PUBLIC_URL: "${LIFE_POINTS_API_URL:-http://127.0.0.1:8090}"
+      LIFE_POINTS_SMTP_HOST: mail
+      LIFE_POINTS_SMTP_PORT: 1025
+      LIFE_POINTS_WEB_URL: "${LIFE_POINTS_WEB_URL:-http://127.0.0.1:4173}"
     volumes:
       - backend-data:/pb/pb_data
     healthcheck:
@@ -14,6 +29,9 @@ services:
       timeout: 2s
       retries: 20
       start_period: 3s
+    depends_on:
+      mail:
+        condition: service_healthy
 
   frontend:
     image: node:22.21.1-alpine
