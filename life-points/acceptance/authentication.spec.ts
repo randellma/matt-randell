@@ -85,7 +85,7 @@ test('Game Owner enters with either OTP credential and keeps control of local ac
   request,
 }) => {
   await page.goto('/');
-  await page.getByLabel('Email address').fill('ysabel@example.test');
+  await page.getByLabel('Email address').fill('ysabel08@gmail.com');
   const otpResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/collections/accounts/request-otp') &&
@@ -94,7 +94,7 @@ test('Game Owner enters with either OTP credential and keeps control of local ac
   await page.getByRole('button', { name: 'Email me a code' }).click();
 
   const firstOtpId = ((await (await otpResponse).json()) as { otpId: string }).otpId;
-  const firstOtp = await waitForOtp('ysabel@example.test', firstOtpId);
+  const firstOtp = await waitForOtp('ysabel08@gmail.com', firstOtpId);
   await expect(page.getByText('The code expires in 3 minutes.')).toBeVisible();
   expect(firstOtp.code).toMatch(/^\d{8}$/);
 
@@ -112,7 +112,7 @@ test('Game Owner enters with either OTP credential and keeps control of local ac
   await page.goto(firstOtp.link);
   await expect(page.getByText('That code has already been used or has expired.')).toBeVisible();
 
-  const secondOtp = await requestOtp(request, 'ysabel@example.test');
+  const secondOtp = await requestOtp(request, 'ysabel08@gmail.com');
   await page.goto(secondOtp.captured.link);
   await expect(page.getByRole('heading', { name: 'Welcome, Ysabel' })).toBeVisible();
   await expect(page.getByText("Ysabel's Life Points")).toBeVisible();
@@ -125,7 +125,7 @@ test('Game Owner enters with either OTP credential and keeps control of local ac
 });
 
 test('two seeded Accounts cannot cross their Game tenant boundary', async ({ request }) => {
-  const ysabel = await authenticateWithCode(request, 'ysabel@example.test');
+  const ysabel = await authenticateWithCode(request, 'ysabel08@gmail.com');
   const rowan = await authenticateWithCode(request, 'friend@example.test');
 
   const ownGame = await request.get(

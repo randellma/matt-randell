@@ -24,7 +24,7 @@ Mailpit at <http://127.0.0.1:8025>.
 
 The versioned development seed provides two isolated Game Owners:
 
-- `ysabel@example.test` — Ysabel, owner of `Ysabel's Life Points`;
+- `ysabel08@gmail.com` — Ysabel, owner of `Ysabel's Life Points`;
 - `friend@example.test` — Rowan, owner of `Rowan's Life Points`.
 
 The web, API, and mail ports can be changed without editing files:
@@ -70,3 +70,20 @@ The PocketBase Coolify application builds from `/life-points/backend/Dockerfile`
 `8090`, sets `LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com`, and persists
 `/pb/pb_data` in a named volume. Deploy the Account and Game migration only after persistent
 storage has an off-server backup and production SMTP is configured.
+
+### Production email and seeded Game Owner
+
+Life Points uses PocketBase's native OTP flow. Local Compose delivers through Mailpit;
+production's OTP mail hook delivers through Resend's HTTP API, matching HeySlate. Configure these
+environment variables on the Life Points backend in Coolify before its first production deploy:
+
+```text
+LIFE_POINTS_PUBLIC_URL=https://lifepoints-api.mattrandell.com
+LIFE_POINTS_WEB_URL=https://lifepoints.mattrandell.com
+RESEND_API_KEY=<Life Points sending-only Resend API key>
+```
+
+Create a dedicated Resend API key with sending-only access to the already verified
+`heyslate.app` domain. Do not commit the key. The seeded Game Owner is intentionally fixed in the
+migration as `ysabel08@gmail.com`, with Player Name `Ysabel` and Game title
+`Ysabel's Life Points`.
