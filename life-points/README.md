@@ -8,6 +8,8 @@ This directory contains the independently runnable first slice of Life Points:
 - passwordless PocketBase Accounts with eight-digit, three-minute email OTPs;
 - verified public Account and Game onboarding without invitations;
 - transactionally provisioned Categories, Activities, Rewards, and Monthly Quest slots;
+- a Game-scoped quick-add flow with immutable Activity and Category snapshots;
+- immediate History, Lifetime Points, and Available Points updates after logging;
 - Game-scoped record and protected-file rules;
 - versioned migration, collection-rule, hook, and Starter Pack seed structure;
 - one Compose stack shared by local development and black-box browser acceptance tests.
@@ -28,6 +30,11 @@ Visitors can start an independent Game with any valid email address. Life Points
 pending Account before the email OTP is used; Player Name, Game, ownership, and the complete
 Starter Pack are committed together after verification. Repeating either registration or
 provisioning reuses the same Account and Game.
+
+From Home, a Player can open quick-add, choose an active Starter Pack Activity grouped by
+Category, and save it for today's local calendar date. The resulting Activity Entry snapshots
+the Activity and Category presentation used at award time; History and point totals refresh
+immediately without a page reload.
 
 The versioned development seed also provides two isolated Game Owners:
 
