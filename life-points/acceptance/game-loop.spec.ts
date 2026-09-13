@@ -199,3 +199,93 @@ test('Player stacks Activities and intentionally repeats one on the same day', a
   await expect(stackedEntry).toContainText('30-min walk');
   await expect(stackedEntry).toContainText('Strength workout');
 });
+
+test('Player backdates an Activity Entry and History uses occurred-on date order', async ({
+  page,
+}) => {
+  await onboard(page, 'backdated-entry@example.test');
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+
+  const occurredOn = page.getByLabel('Occurred on');
+  await expect(occurredOn).toHaveValue(await page.evaluate(() => {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }));
+
+  await occurredOn.fill('2025-12-31');
+  await page.getByRole('checkbox', { name: '30-min walk, 5 points' }).check();
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+  await expect(page.locator('.history-entry').first()).toContainText('2025-12-31');
+
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+  await occurredOn.fill('2025-12-31');
+  await expect(occurredOn).toHaveValue('2025-12-31');
+  await page.getByRole('checkbox', { name: 'Strength workout, 10 points' }).check();
+  await expect(page.getByRole('button', { name: 'Save Activity Entry' })).toBeEnabled();
+  expect(await page.locator('#quick-add-form').evaluate((form) => form.checkValidity())).toBe(true);
+  const secondSave = page.waitForResponse((response) =>
+    response.url().endsWith('/api/life-points/v1/activity-entries') && response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+  const secondSaveResponse = await secondSave;
+  expect(secondSaveResponse.status()).toBe(201);
+  expect((await secondSaveResponse.json()) as { entry: { points: number } }).toMatchObject({
+    entry: { points: 10 },
+  });
+  await expect(page.getByRole('status')).toHaveText('10 points earned');
+
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+  await occurredOn.fill('2026-01-01');
+  await page.getByRole('checkbox', { name: 'Strength workout, 10 points' }).check();
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+
+  const historyEntries = page.locator('.history-entry');
+  await expect(historyEntries).toHaveCount(3);
+  await expect(historyEntries.nth(0)).toContainText('2026-01-01');
+  await expect(historyEntries.nth(1)).toContainText('2025-12-31');
+  await expect(historyEntries.nth(1)).toContainText('Strength workout');
+  await expect(historyEntries.nth(2)).toContainText('30-min walk');
+});
+
+test('Player totals Activity Entries from Monday through Sunday and the occurred-on month', async ({
+  page,
+  request,
+}) => {
+  const session = await onboard(page, 'calendar-boundaries@example.test');
+  const authorization = { Authorization: session.token };
+  const activitiesResponse = await request.get(
+    `${apiUrl}/api/collections/activities/records?perPage=200`,
+    { headers: authorization },
+  );
+  const activities = (await activitiesResponse.json()) as {
+    items: Array<{ id: string; name: string }>;
+  };
+  const walk = activities.items.find(({ name }) => name === '30-min walk')!;
+
+  for (const occurredOn of ['2025-12-29', '2025-12-31', '2026-01-01', '2026-01-04']) {
+    const response = await request.post(`${apiUrl}/api/life-points/v1/activity-entries`, {
+      data: { activityIds: [walk.id], occurredOn },
+      headers: authorization,
+    });
+    expect(response.status()).toBe(201);
+  }
+
+  await page.addInitScript(() => {
+    const RealDate = Date;
+    const fixedNow = new RealDate('2026-01-01T12:00:00').valueOf();
+    // @ts-expect-error Replace the browser clock for this boundary scenario.
+    window.Date = class extends RealDate {
+      constructor(...args: ConstructorParameters<typeof RealDate>) {
+        super(...(args.length === 0 ? [fixedNow] : args));
+      }
+
+      static now() {
+        return fixedNow;
+      }
+    };
+  });
+  await page.reload();
+
+  await expect(page.getByText('This Week').locator('..')).toContainText('20');
+  await expect(page.getByText('This Month').locator('..')).toContainText('10');
+});

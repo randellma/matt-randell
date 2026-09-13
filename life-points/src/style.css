@@ -7,6 +7,13 @@
   text-rendering: optimizeLegibility;
 }
 
+html,
+body,
+#app {
+  min-height: 100%;
+  background: var(--viewport-edge);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -216,7 +223,7 @@ button:focus-visible {
 
 .home-shell {
   align-content: start;
-  gap: 20px;
+  gap: 12px;
 }
 
 .home-header {
@@ -234,20 +241,20 @@ button:focus-visible {
 .home-card {
   width: min(100%, 540px);
   align-self: start;
-  padding-block: 26px;
+  padding-block: 18px;
 }
 
 .point-totals {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-top: 26px;
+  margin-top: 16px;
 }
 
 .point-totals div {
   display: grid;
   gap: 6px;
-  padding: 16px 10px;
+  padding: 10px 8px;
   border: 1px solid #e8cfb0;
   border-radius: 18px;
   background: #fff6e8;
@@ -269,7 +276,7 @@ button:focus-visible {
 .save-entry {
   width: 100%;
   min-height: 52px;
-  margin-top: 18px;
+  margin-top: 12px;
   border: 0;
   border-radius: 16px;
   background: #b62f61;
@@ -287,7 +294,7 @@ button:focus-visible {
 
 .history-card {
   width: min(100%, 540px);
-  padding: 20px 26px;
+  padding: 14px 26px;
   text-align: left;
 }
 

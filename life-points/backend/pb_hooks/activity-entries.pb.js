@@ -48,6 +48,7 @@ routerAdd(
       entry.set('account', account.id);
       entry.set('occurredOn', occurredOn);
       entry.set('points', points);
+      entry.set('recordedAt', new Date().toISOString());
       txApp.save(entry);
 
       const items = selections.map(({ activity, category }) => {

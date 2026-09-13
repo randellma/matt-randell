@@ -29,6 +29,7 @@ type ActivityEntry = {
   id: string;
   occurredOn: string;
   points: number;
+  recordedAt: string;
 };
 type ActivityEntryItem = {
   activity: string;
@@ -57,13 +58,13 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function apiListAll<T>(collection: string, token: string): Promise<T[]> {
+async function apiListAll<T>(collection: string, token: string, query = ''): Promise<T[]> {
   const items: T[] = [];
   let page = 1;
   let totalPages = 1;
   do {
     const result = await apiRequest<RecordList<T>>(
-      `/api/collections/${collection}/records?perPage=200&page=${page}`,
+      `/api/collections/${collection}/records?perPage=200&page=${page}${query}`,
       { headers: { Authorization: token } },
     );
     items.push(...result.items);
@@ -207,11 +208,23 @@ function renderOnboarding(session: AuthSession, message = ''): void {
   });
 }
 
-function localCalendarDate(): string {
-  const date = new Date();
+function formatCalendarDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function localCalendarDate(): string {
+  return formatCalendarDate(new Date());
+}
+
+function localWeekRange(): { end: string; start: string } {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return { start: formatCalendarDate(start), end: formatCalendarDate(end) };
 }
 
 async function renderHome(session: AuthSession, game: Game, message = ''): Promise<void> {
@@ -228,8 +241,20 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
     .sort((left, right) => left.sortOrder - right.sortOrder);
   const entries = gameEntries
     .filter((entry) => entry.account === account.id)
-    .sort((left, right) => right.occurredOn.localeCompare(left.occurredOn));
+    .sort(
+      (left, right) =>
+        right.occurredOn.localeCompare(left.occurredOn) ||
+        right.recordedAt.localeCompare(left.recordedAt),
+    );
   const lifetimePoints = entries.reduce((total, entry) => total + entry.points, 0);
+  const week = localWeekRange();
+  const weeklyPoints = entries
+    .filter((entry) => entry.occurredOn >= week.start && entry.occurredOn <= week.end)
+    .reduce((total, entry) => total + entry.points, 0);
+  const month = localCalendarDate().slice(0, 7);
+  const monthlyPoints = entries
+    .filter((entry) => entry.occurredOn.startsWith(month))
+    .reduce((total, entry) => total + entry.points, 0);
   const activitiesByCategory = new Map<string, Activity[]>();
   for (const activity of activeActivities) {
     const categoryActivities = activitiesByCategory.get(activity.category) ?? [];
@@ -284,6 +309,8 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
         <div class="point-totals">
           <div><span>Lifetime Points</span><strong>${lifetimePoints}</strong></div>
           <div><span>Available Points</span><strong>${lifetimePoints}</strong></div>
+          <div><span>This Week</span><strong>${weeklyPoints}</strong></div>
+          <div><span>This Month</span><strong>${monthlyPoints}</strong></div>
         </div>
         <button class="quick-add" id="quick-add" type="button">Log an Activity Entry</button>
         <p class="save-message" role="status" aria-live="polite">${escapeHtml(message)}</p>
@@ -295,6 +322,8 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
       <dialog class="quick-add-sheet" id="quick-add-sheet" aria-labelledby="quick-add-title">
         <form id="quick-add-form">
           <header><div><p class="eyebrow">Quick-add</p><h1 id="quick-add-title">What felt good today?</h1></div><button class="close-sheet" id="close-sheet" type="button" aria-label="Close">×</button></header>
+          <label for="occurred-on">Occurred on</label>
+          <input id="occurred-on" name="occurredOn" type="date" value="${localCalendarDate()}" required />
           <div class="activity-groups">${categorySections}</div>
           <button class="save-entry" type="submit" disabled>Save Activity Entry</button>
         </form>
@@ -307,24 +336,37 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
   const sheet = document.querySelector<HTMLDialogElement>('#quick-add-sheet')!;
   const form = document.querySelector<HTMLFormElement>('#quick-add-form')!;
   const saveButton = form.querySelector<HTMLButtonElement>('.save-entry')!;
-  document.querySelector<HTMLButtonElement>('#quick-add')!.addEventListener('click', () => sheet.showModal());
+  document.querySelector<HTMLButtonElement>('#quick-add')!.addEventListener('click', () => {
+    form.querySelectorAll<HTMLInputElement>('input[name="activity"]').forEach((activity) => {
+      activity.checked = false;
+    });
+    saveButton.disabled = true;
+    sheet.showModal();
+  });
   document.querySelector<HTMLButtonElement>('#close-sheet')!.addEventListener('click', () => sheet.close());
   form.addEventListener('change', () => {
     saveButton.disabled = form.querySelectorAll<HTMLInputElement>('input[name="activity"]:checked').length < 1;
   });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const activityIds = new FormData(form).getAll('activity').map((value) => value.toString());
+    const values = new FormData(form);
+    const activityIds = values.getAll('activity').map((value) => value.toString());
+    const occurredOn = values.get('occurredOn')?.toString() ?? '';
     if (activityIds.length < 1) return;
     saveButton.disabled = true;
-    void saveActivityEntry(session, game, activityIds);
+    void saveActivityEntry(session, game, activityIds, occurredOn);
   });
 }
 
-async function saveActivityEntry(session: AuthSession, game: Game, activityIds: string[]): Promise<void> {
+async function saveActivityEntry(
+  session: AuthSession,
+  game: Game,
+  activityIds: string[],
+  occurredOn: string,
+): Promise<void> {
   try {
     const result = await apiRequest<{ entry: { points: number } }>('/api/life-points/v1/activity-entries', {
-      body: JSON.stringify({ activityIds, occurredOn: localCalendarDate() }),
+      body: JSON.stringify({ activityIds, occurredOn }),
       headers: { Authorization: session.token },
       method: 'POST',
     });
