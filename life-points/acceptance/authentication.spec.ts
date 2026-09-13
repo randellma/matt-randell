@@ -49,6 +49,18 @@ async function expectViewportEdgesToMatchTheme(page: Page): Promise<void> {
     difference(edgeColor(screenshot.height - 1)),
     'bottom viewport edge should blend into Safari chrome',
   ).toBeLessThanOrEqual(5);
+
+  const footerStart = Math.floor(screenshot.height * 0.9);
+  const footerBandDifference = Math.max(
+    ...Array.from(
+      { length: screenshot.height - footerStart },
+      (_, offset) => difference(edgeColor(footerStart + offset)),
+    ),
+  );
+  expect(
+    footerBandDifference,
+    'footer background should stay even behind Safari chrome',
+  ).toBeLessThanOrEqual(5);
 }
 
 async function waitForOtp(email: string, expectedOtpId: string): Promise<CapturedOtp> {

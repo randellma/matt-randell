@@ -42,7 +42,6 @@ function renderWelcome(message = ''): void {
   app.innerHTML = `
     <main class="welcome-shell">
       <div class="sun-glow" aria-hidden="true"></div>
-      <div class="leaf leaf-one" aria-hidden="true"></div>
       <div class="leaf leaf-two" aria-hidden="true"></div>
       <section class="welcome-card" aria-labelledby="welcome-title">
         <div class="brand-mark" aria-hidden="true">
