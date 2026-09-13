@@ -160,3 +160,42 @@ test('Player logs one Activity and immediately earns points in their Game', asyn
   });
   expect(crossGameEntry.status()).toBe(404);
 });
+
+test('Player stacks Activities and intentionally repeats one on the same day', async ({
+  page,
+}) => {
+  await onboard(page, 'stacked-day@example.test');
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+
+  const walk = page.getByRole('checkbox', { name: '30-min walk, 5 points' });
+  const strength = page.getByRole('checkbox', { name: 'Strength workout, 10 points' });
+  const newCafe = page.getByRole('checkbox', { name: 'New café, 5 points' });
+  await walk.check();
+  await strength.check();
+  await newCafe.check();
+  await newCafe.uncheck();
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+
+  await expect(page.getByRole('status')).toHaveText('15 points earned');
+  const historyEntries = page.locator('.history-entry');
+  await expect(historyEntries).toHaveCount(1);
+  await expect(historyEntries.first()).toContainText('30-min walk');
+  await expect(historyEntries.first()).toContainText('Strength workout');
+  await expect(historyEntries.first()).toContainText('+15 points');
+
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+  await expect(page.getByText('Already logged today', { exact: true })).toHaveCount(2);
+  await expect(walk).toBeEnabled();
+  await walk.check();
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+
+  await expect(page.getByRole('status')).toHaveText('5 points earned');
+  await expect(page.getByText('Lifetime Points').locator('..')).toContainText('20');
+  await expect(page.getByText('Available Points').locator('..')).toContainText('20');
+  await expect(historyEntries).toHaveCount(2);
+  const repeatedEntry = historyEntries.filter({ hasText: '+5 points' });
+  await expect(repeatedEntry).toContainText('30-min walk');
+  const stackedEntry = historyEntries.filter({ hasText: '+15 points' });
+  await expect(stackedEntry).toContainText('30-min walk');
+  await expect(stackedEntry).toContainText('Strength workout');
+});

@@ -24,8 +24,14 @@ type Activity = {
   points: number;
   sortOrder: number;
 };
-type ActivityEntry = { account: string; id: string; occurredOn: string; points: number };
+type ActivityEntry = {
+  account: string;
+  id: string;
+  occurredOn: string;
+  points: number;
+};
 type ActivityEntryItem = {
+  activity: string;
   activityName: string;
   categoryColor: string;
   categoryName: string;
@@ -236,6 +242,16 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
     entryItems.push(item);
     itemsByEntry.set(item.entry, entryItems);
   }
+  const todayEntryIds = new Set(
+    entries
+      .filter((entry) => entry.occurredOn === localCalendarDate())
+      .map((entry) => entry.id),
+  );
+  const activityIdsLoggedToday = new Set(
+    entryItems
+      .filter((item) => todayEntryIds.has(item.entry))
+      .map((item) => item.activity),
+  );
   const categorySections = categories
     .filter((category) => activitiesByCategory.has(category.id))
     .map((category) => `
@@ -245,7 +261,7 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
           ${(activitiesByCategory.get(category.id) ?? []).map((activity) => `
             <label class="activity-option">
               <input type="checkbox" name="activity" value="${activity.id}" aria-label="${escapeHtml(activity.name)}, ${activity.points} points" />
-              <span>${escapeHtml(activity.name)}</span><strong>${activity.points}</strong>
+              <span>${escapeHtml(activity.name)}${activityIdsLoggedToday.has(activity.id) ? '<small>Already logged today</small>' : ''}</span><strong>${activity.points}</strong>
             </label>`).join('')}
         </div>
       </section>`).join('');
