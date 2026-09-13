@@ -6,6 +6,8 @@ This directory contains the independently runnable first slice of Life Points:
 - PocketBase `0.40.4`, pinned and checksum-verified in the backend image;
 - a versioned `GET /api/life-points/v1/health` hook;
 - passwordless PocketBase Accounts with eight-digit, three-minute email OTPs;
+- verified public Account and Game onboarding without invitations;
+- transactionally provisioned Categories, Activities, Rewards, and Monthly Quest slots;
 - Game-scoped record and protected-file rules;
 - versioned migration, collection-rule, hook, and Starter Pack seed structure;
 - one Compose stack shared by local development and black-box browser acceptance tests.
@@ -22,7 +24,12 @@ Open <http://127.0.0.1:4173>. The browser reaches PocketBase at
 <http://127.0.0.1:8090/api/life-points/v1/health>. Captured development email is available in
 Mailpit at <http://127.0.0.1:8025>.
 
-The versioned development seed provides two isolated Game Owners:
+Visitors can start an independent Game with any valid email address. Life Points creates only a
+pending Account before the email OTP is used; Player Name, Game, ownership, and the complete
+Starter Pack are committed together after verification. Repeating either registration or
+provisioning reuses the same Account and Game.
+
+The versioned development seed also provides two isolated Game Owners:
 
 - `ysabel08@gmail.com` — Ysabel, owner of `Ysabel's Life Points`;
 - `friend@example.test` — Rowan, owner of `Rowan's Life Points`.
@@ -52,8 +59,8 @@ npm test
 `npm test` selects available host ports, starts the complete stack under an isolated Compose
 project, waits for all services, and runs the mobile Chromium journeys. The tests retrieve real
 OTP credentials from Mailpit, cover code and magic-link entry, session restoration and sign-out,
-and attempt cross-Game record mutations and protected-file reads. The runner always removes its
-containers and volumes.
+public signup, complete idempotent Starter Pack provisioning, and cross-Game record mutations and
+protected-file reads. The runner always removes its containers and volumes.
 
 ## Production hosting
 

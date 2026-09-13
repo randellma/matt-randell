@@ -3,9 +3,12 @@ import './style.css';
 const pocketBaseUrl = import.meta.env.VITE_POCKETBASE_URL ?? 'http://127.0.0.1:8090';
 const sessionKey = 'life-points-session';
 
-type Account = { game: string; id: string; playerName: string };
-type AuthSession = { record: Account; token: string };
+type Account = { game: string; id: string; playerName: string; verified: true };
+type PendingAuthRecord = { game: ''; id: string; playerName: ''; verified: true };
+type AuthRecord = Account | PendingAuthRecord;
+type AuthSession = { record: AuthRecord; token: string };
 type Game = { id: string; title: string };
+type OnboardingResult = { account: Account; game: Game };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -36,6 +39,15 @@ function readSession(): AuthSession | null {
 
 function saveSession(session: AuthSession): void {
   localStorage.setItem(sessionKey, JSON.stringify(session));
+}
+
+function isPendingAuthRecord(record: AuthRecord): record is PendingAuthRecord {
+  return record.game === '';
+}
+
+function defaultGameTitle(playerName: string): string {
+  const trimmedName = playerName.trim();
+  return trimmedName === '' ? '' : `${trimmedName}'s Life Points`;
 }
 
 function renderWelcome(message = ''): void {
@@ -110,6 +122,45 @@ function renderLoading(): void {
   app.innerHTML = '<main class="entry-shell"><p class="loading-message" role="status">Opening your garden…</p></main>';
 }
 
+function renderOnboarding(session: AuthSession, message = ''): void {
+  app.innerHTML = `
+    <main class="entry-shell"><section class="entry-card" aria-labelledby="onboarding-title">
+      <p class="eyebrow">Your email is verified</p>
+      <h1 id="onboarding-title">Make it yours.</h1>
+      <p>Choose how Life Points greets you. Your complete Starter Pack will be waiting inside.</p>
+      <form class="entry-form" id="onboarding-form">
+        <label for="player-name">Player Name</label>
+        <input id="player-name" name="playerName" autocomplete="name" maxlength="80" required />
+        <label for="game-title">Game title</label>
+        <input id="game-title" name="title" maxlength="120" required />
+        <button type="submit">Start my Game</button>
+      </form>
+      <p class="form-message" role="alert">${escapeHtml(message)}</p>
+    </section></main>`;
+
+  const form = document.querySelector<HTMLFormElement>('#onboarding-form')!;
+  const playerName = document.querySelector<HTMLInputElement>('#player-name')!;
+  const title = document.querySelector<HTMLInputElement>('#game-title')!;
+  let titleWasEdited = false;
+  playerName.addEventListener('input', () => {
+    if (!titleWasEdited) {
+      title.value = defaultGameTitle(playerName.value);
+    }
+  });
+  title.addEventListener('input', () => {
+    titleWasEdited = title.value !== defaultGameTitle(playerName.value);
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = new FormData(form);
+    void provisionGame(
+      session,
+      values.get('playerName')?.toString() ?? '',
+      values.get('title')?.toString() ?? '',
+    );
+  });
+}
+
 function renderHome(account: Account, game: Game): void {
   app.innerHTML = `
     <main class="home-shell">
@@ -154,7 +205,11 @@ async function authenticate(
     saveSession(session);
     sessionStorage.removeItem('life-points-pending-otp');
     history.replaceState({}, '', location.pathname);
-    await openHome(session);
+    if (isPendingAuthRecord(session.record)) {
+      renderOnboarding(session);
+    } else {
+      await openHome(session);
+    }
   } catch {
     history.replaceState({}, '', location.pathname);
     retry();
@@ -162,11 +217,37 @@ async function authenticate(
   }
 }
 
+async function provisionGame(
+  session: AuthSession,
+  playerName: string,
+  title: string,
+): Promise<void> {
+  renderLoading();
+  try {
+    const result = await apiRequest<OnboardingResult>('/api/life-points/v1/onboarding', {
+      body: JSON.stringify({ playerName, title }),
+      headers: { Authorization: session.token },
+      method: 'POST',
+    });
+    const provisionedSession = { ...session, record: result.account };
+    saveSession(provisionedSession);
+    renderHome(result.account, result.game);
+  } catch {
+    renderOnboarding(session, 'We could not create your Game just now. Please try again.');
+  }
+}
+
 async function openHome(session: AuthSession): Promise<void> {
   try {
-    const account = await apiRequest<Account>(`/api/collections/accounts/records/${session.record.id}`, {
+    const account = await apiRequest<AuthRecord>(`/api/collections/accounts/records/${session.record.id}`, {
       headers: { Authorization: session.token },
     });
+    if (isPendingAuthRecord(account)) {
+      const pendingSession = { ...session, record: account };
+      saveSession(pendingSession);
+      renderOnboarding(pendingSession);
+      return;
+    }
     const game = await apiRequest<Game>(`/api/collections/games/records/${account.game}`, {
       headers: { Authorization: session.token },
     });

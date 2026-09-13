@@ -1,6 +1,80 @@
 {
   "schemaVersion": 1,
-  "categories": [],
-  "activities": [],
-  "rewards": []
+  "categories": [
+    {
+      "name": "Move", "color": "#3F7D6C", "plantFamily": "fern",
+      "activities": [
+        { "name": "Strength workout", "points": 10 }, { "name": "30-min walk", "points": 5 },
+        { "name": "60+ min walk/hike", "points": 8 }, { "name": "Long hike/active outing", "points": 12 },
+        { "name": "New workout", "points": 12 }, { "name": "20-min mobility/stretch", "points": 4 },
+        { "name": "Walk instead of drive", "points": 3 }, { "name": "Workout + walk same day", "points": 3 }
+      ]
+    },
+    {
+      "name": "Create", "color": "#B35C87", "plantFamily": "blossom",
+      "activities": [
+        { "name": "Write 20 min", "points": 5 }, { "name": "Write 30 min", "points": 8 },
+        { "name": "Write 60 min", "points": 12 }, { "name": "1,000+ words", "points": 15 },
+        { "name": "Finish a scene", "points": 10 }, { "name": "Finish a chapter", "points": 15 },
+        { "name": "Plot/development work", "points": 8 }, { "name": "Read 30 min", "points": 5 },
+        { "name": "Finish a book", "points": 15 }, { "name": "Creative project", "points": 8 }
+      ]
+    },
+    {
+      "name": "Explore", "color": "#D48B3F", "plantFamily": "vine",
+      "activities": [
+        { "name": "New café", "points": 5 }, { "name": "New restaurant", "points": 8 },
+        { "name": "New neighborhood", "points": 8 }, { "name": "Somewhere you've never been", "points": 12 },
+        { "name": "New hiking trail", "points": 10 }, { "name": "Museum/gallery", "points": 10 },
+        { "name": "Live music", "points": 12 }, { "name": "Theatre/comedy", "points": 12 },
+        { "name": "Winery/tasting", "points": 12 }, { "name": "Class/workshop", "points": 15 },
+        { "name": "Something you've never done", "points": 15 }, { "name": "Spontaneous adventure", "points": 15 },
+        { "name": "Day trip", "points": 20 }, { "name": "Weekend getaway", "points": 30 }
+      ]
+    },
+    {
+      "name": "Connect", "color": "#8F5AA8", "plantFamily": "climbing-rose",
+      "activities": [
+        { "name": "See a friend", "points": 8 }, { "name": "Make actual plans instead of texting", "points": 5 },
+        { "name": "Host friends", "points": 15 }, { "name": "Dinner with friends", "points": 10 },
+        { "name": "Girls' night", "points": 10 }, { "name": "Call someone you love", "points": 3 },
+        { "name": "Coffee with someone", "points": 5 }, { "name": "Go to an event you almost skipped", "points": 10 },
+        { "name": "Make a new social connection", "points": 10 }
+      ]
+    },
+    {
+      "name": "Nurture", "color": "#6E8B57", "plantFamily": "herbs",
+      "activities": [
+        { "name": "Healthy dinner", "points": 5 }, { "name": "New recipe", "points": 8 },
+        { "name": "Garden", "points": 5 }, { "name": "Home project", "points": 8 },
+        { "name": "Declutter an area", "points": 5 }, { "name": "Deep-clean something you've avoided", "points": 8 },
+        { "name": "Creative home project", "points": 5 }, { "name": "Self-care ritual", "points": 5 },
+        { "name": "Afternoon outside", "points": 8 }, { "name": "Complete a procrastinated task", "points": 8 }
+      ]
+    },
+    {
+      "name": "Enjoy", "color": "#C84F70", "plantFamily": "peony",
+      "activities": [
+        { "name": "Read somewhere beautiful", "points": 5 }, { "name": "Coffee outside", "points": 3 },
+        { "name": "Cocktail somewhere fun", "points": 5 }, { "name": "Dessert out", "points": 5 },
+        { "name": "Solo date", "points": 10 }, { "name": "Movie you genuinely want to watch", "points": 3 },
+        { "name": "Buy yourself flowers", "points": 3 }, { "name": "Do something purely for fun", "points": 8 },
+        { "name": "Main Character Day", "points": 10 }
+      ]
+    },
+    {
+      "name": "Bonus", "color": "#B28A2E", "plantFamily": "sunflower",
+      "activities": [
+        { "name": "I almost didn't", "points": 5 }, { "name": "Main character moment", "points": 10 },
+        { "name": "Wild card", "points": 10 }
+      ]
+    }
+  ],
+  "rewards": [
+    { "name": "Little Treat", "cost": 50 }, { "name": "Nice Night", "cost": 100 },
+    { "name": "Experience", "cost": 200 }, { "name": "Big Treat", "cost": 350 },
+    { "name": "Adventure", "cost": 500 }, { "name": "Dream Reward", "cost": 1000 }
+  ],
+  "monthlyQuestSlots": 3,
+  "monthlyQuestPoints": 50
 }
