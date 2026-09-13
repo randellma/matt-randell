@@ -82,7 +82,7 @@ test('Player logs one Activity and immediately earns points in their Game', asyn
 
   await expect(page.getByText('Lifetime Points').locator('..')).toContainText('0');
   await expect(page.getByText('Available Points').locator('..')).toContainText('0');
-  await page.getByRole('button', { name: 'Add an Activity' }).click();
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
 
   await expect(page.getByRole('heading', { name: 'Move' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Create' })).toBeVisible();
@@ -130,13 +130,32 @@ test('Player logs one Activity and immediately earns points in their Game', asyn
   });
 
   const activitiesResponse = await request.get(
-    `${apiUrl}/api/collections/activities/records?filter=${encodeURIComponent("name = 'Strength workout'")}`,
+    `${apiUrl}/api/collections/activities/records?perPage=200`,
     { headers: authorization },
   );
-  const activities = (await activitiesResponse.json()) as { items: Array<{ id: string }> };
+  const activities = (await activitiesResponse.json()) as {
+    items: Array<{ id: string; name: string }>;
+  };
+  const strengthWorkout = activities.items.find(({ name }) => name === 'Strength workout')!;
+  const walk = activities.items.find(({ name }) => name === '30-min walk')!;
+  const invalidDateEntry = await request.post(`${apiUrl}/api/life-points/v1/activity-entries`, {
+    data: { activityIds: [strengthWorkout.id], occurredOn: '2026-99-99' },
+    headers: authorization,
+  });
+  expect(invalidDateEntry.status()).toBe(400);
+
+  const stackedEntry = await request.post(`${apiUrl}/api/life-points/v1/activity-entries`, {
+    data: { activityIds: [strengthWorkout.id, walk.id], occurredOn: today },
+    headers: authorization,
+  });
+  expect(stackedEntry.status()).toBe(201);
+  expect((await stackedEntry.json()) as { entry: { points: number } }).toMatchObject({
+    entry: { points: 15 },
+  });
+
   const otherAccount = await authenticateWithCode(request, 'friend@example.test');
   const crossGameEntry = await request.post(`${apiUrl}/api/life-points/v1/activity-entries`, {
-    data: { activityId: activities.items[0].id, occurredOn: today },
+    data: { activityIds: [strengthWorkout.id], occurredOn: today },
     headers: { Authorization: otherAccount.token },
   });
   expect(crossGameEntry.status()).toBe(404);

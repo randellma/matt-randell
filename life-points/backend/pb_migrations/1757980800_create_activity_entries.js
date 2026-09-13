@@ -18,7 +18,7 @@ migrate(
         { type: 'relation', name: 'game', required: true, maxSelect: 1, collectionId: games.id, cascadeDelete: true },
         { type: 'relation', name: 'account', required: true, maxSelect: 1, collectionId: accounts.id, cascadeDelete: true },
         { type: 'text', name: 'occurredOn', required: true, min: 10, max: 10, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' },
-        { type: 'number', name: 'points', required: true, min: 1, max: 10000, onlyInt: true },
+        { type: 'number', name: 'points', required: true, min: 1, onlyInt: true },
       ],
       indexes: [
         'CREATE INDEX idx_activity_entries_game_date ON activity_entries (game, occurredOn)',

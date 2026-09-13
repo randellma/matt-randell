@@ -269,7 +269,7 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
           <div><span>Lifetime Points</span><strong>${lifetimePoints}</strong></div>
           <div><span>Available Points</span><strong>${lifetimePoints}</strong></div>
         </div>
-        <button class="quick-add" id="quick-add" type="button">Add an Activity</button>
+        <button class="quick-add" id="quick-add" type="button">Log an Activity Entry</button>
         <p class="save-message" role="status" aria-live="polite">${escapeHtml(message)}</p>
       </section>
       <section class="history-card" aria-labelledby="history-title">
@@ -294,21 +294,21 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
   document.querySelector<HTMLButtonElement>('#quick-add')!.addEventListener('click', () => sheet.showModal());
   document.querySelector<HTMLButtonElement>('#close-sheet')!.addEventListener('click', () => sheet.close());
   form.addEventListener('change', () => {
-    saveButton.disabled = form.querySelectorAll<HTMLInputElement>('input[name="activity"]:checked').length !== 1;
+    saveButton.disabled = form.querySelectorAll<HTMLInputElement>('input[name="activity"]:checked').length < 1;
   });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const activityId = new FormData(form).get('activity')?.toString();
-    if (!activityId) return;
+    const activityIds = new FormData(form).getAll('activity').map((value) => value.toString());
+    if (activityIds.length < 1) return;
     saveButton.disabled = true;
-    void saveActivityEntry(session, game, activityId);
+    void saveActivityEntry(session, game, activityIds);
   });
 }
 
-async function saveActivityEntry(session: AuthSession, game: Game, activityId: string): Promise<void> {
+async function saveActivityEntry(session: AuthSession, game: Game, activityIds: string[]): Promise<void> {
   try {
     const result = await apiRequest<{ entry: { points: number } }>('/api/life-points/v1/activity-entries', {
-      body: JSON.stringify({ activityId, occurredOn: localCalendarDate() }),
+      body: JSON.stringify({ activityIds, occurredOn: localCalendarDate() }),
       headers: { Authorization: session.token },
       method: 'POST',
     });
