@@ -20,11 +20,36 @@ test('visitor sees the Life Points promise and a healthy versioned API', async (
     status: 'healthy',
   });
 
+  const card = await page.locator('.welcome-card').boundingBox();
+  const footer = await page.locator('.footer-note').boundingBox();
+  expect(card).not.toBeNull();
+  expect(footer).not.toBeNull();
+  expect.soft(
+    footer!.y - (card!.y + card!.height),
+    'footer should have breathing room below the welcome card',
+  ).toBeGreaterThanOrEqual(24);
+
   const themeColor = await page.locator('meta[name="theme-color"]').getAttribute('content');
   const theme = [1, 3, 5].map((offset) =>
     Number.parseInt(themeColor!.slice(offset, offset + 2), 16),
   );
   const screenshot = PNG.sync.read(await page.screenshot({ fullPage: true }));
+  const topInset = Math.ceil(screenshot.width * 0.02);
+  let topEdgeDifference = 0;
+  for (let x = topInset; x < screenshot.width - topInset; x += 1) {
+    const pixel = x * 4;
+    for (let channel = 0; channel < 3; channel += 1) {
+      topEdgeDifference = Math.max(
+        topEdgeDifference,
+        Math.abs(screenshot.data[pixel + channel] - theme[channel]),
+      );
+    }
+  }
+  expect.soft(
+    topEdgeDifference,
+    'top page edge should stay uniform beneath Safari chrome',
+  ).toBeLessThanOrEqual(5);
+
   const footerStart = Math.floor(screenshot.height * 0.9);
   const sideWidth = Math.ceil(screenshot.width * 0.015);
   let largestDifference = 0;

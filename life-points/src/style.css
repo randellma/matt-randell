@@ -30,9 +30,11 @@ button {
   position: relative;
   display: grid;
   min-height: 100svh;
-  place-items: center;
+  gap: 32px;
+  align-content: center;
+  justify-items: center;
   overflow: hidden;
-  padding: 32px 20px 22px;
+  padding: 32px 20px max(42px, env(safe-area-inset-bottom));
   background:
     radial-gradient(circle at 12% 14%, rgb(255 236 220 / 56%) 0 7%, transparent 7.2%),
     radial-gradient(circle at 91% 75%, rgb(195 67 110 / 16%) 0 13%, transparent 13.2%),
@@ -315,25 +317,13 @@ button:focus-visible {
 }
 
 .footer-note {
-  position: absolute;
+  position: relative;
   z-index: 2;
-  bottom: 10px;
   margin: 0;
   color: rgb(91 31 56 / 66%);
   font-family: Georgia, serif;
   font-size: 0.76rem;
   font-style: italic;
-}
-
-.sun-glow {
-  position: absolute;
-  top: -100px;
-  right: -90px;
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: rgb(255 238 187 / 40%);
-  filter: blur(4px);
 }
 
 .leaf {
