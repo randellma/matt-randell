@@ -267,16 +267,16 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
     entryItems.push(item);
     itemsByEntry.set(item.entry, entryItems);
   }
-  const todayEntryIds = new Set(
-    entries
-      .filter((entry) => entry.occurredOn === localCalendarDate())
-      .map((entry) => entry.id),
-  );
-  const activityIdsLoggedToday = new Set(
-    entryItems
-      .filter((item) => todayEntryIds.has(item.entry))
-      .map((item) => item.activity),
-  );
+  const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+  const activityIdsLoggedByDate = new Map<string, Set<string>>();
+  for (const item of entryItems) {
+    const occurredOn = entriesById.get(item.entry)?.occurredOn;
+    if (!occurredOn) continue;
+    const activityIds = activityIdsLoggedByDate.get(occurredOn) ?? new Set<string>();
+    activityIds.add(item.activity);
+    activityIdsLoggedByDate.set(occurredOn, activityIds);
+  }
+  const activityIdsLoggedToday = activityIdsLoggedByDate.get(localCalendarDate()) ?? new Set();
   const categorySections = categories
     .filter((category) => activitiesByCategory.has(category.id))
     .map((category) => `
@@ -336,6 +336,21 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
   const sheet = document.querySelector<HTMLDialogElement>('#quick-add-sheet')!;
   const form = document.querySelector<HTMLFormElement>('#quick-add-form')!;
   const saveButton = form.querySelector<HTMLButtonElement>('.save-entry')!;
+  const occurredOnInput = form.querySelector<HTMLInputElement>('#occurred-on')!;
+  const updateLoggedHints = () => {
+    const selectedDate = occurredOnInput.value;
+    const activityIds = activityIdsLoggedByDate.get(selectedDate) ?? new Set();
+    form.querySelectorAll<HTMLElement>('.activity-option').forEach((option) => {
+      option.querySelector('small')?.remove();
+      const activity = option.querySelector<HTMLInputElement>('input[name="activity"]')!;
+      if (!activityIds.has(activity.value)) return;
+      const hint = document.createElement('small');
+      hint.textContent = selectedDate === localCalendarDate()
+        ? 'Already logged today'
+        : 'Already logged on this date';
+      option.querySelector('span')!.append(hint);
+    });
+  };
   document.querySelector<HTMLButtonElement>('#quick-add')!.addEventListener('click', () => {
     form.querySelectorAll<HTMLInputElement>('input[name="activity"]').forEach((activity) => {
       activity.checked = false;
@@ -344,6 +359,7 @@ async function renderHome(session: AuthSession, game: Game, message = ''): Promi
     sheet.showModal();
   });
   document.querySelector<HTMLButtonElement>('#close-sheet')!.addEventListener('click', () => sheet.close());
+  occurredOnInput.addEventListener('input', updateLoggedHints);
   form.addEventListener('change', () => {
     saveButton.disabled = form.querySelectorAll<HTMLInputElement>('input[name="activity"]:checked').length < 1;
   });
