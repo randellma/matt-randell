@@ -200,6 +200,24 @@ test('Player stacks Activities and intentionally repeats one on the same day', a
   await expect(stackedEntry).toContainText('Strength workout');
 });
 
+test('Player sees the logged-date hint only for the selected occurred-on date', async ({ page }) => {
+  await onboard(page, 'selected-date-hint@example.test');
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+  await page.getByRole('checkbox', { name: '30-min walk, 5 points' }).check();
+  await page.getByRole('button', { name: 'Save Activity Entry' }).click();
+  await expect(page.getByRole('status')).toHaveText('5 points earned');
+
+  await page.getByRole('button', { name: 'Log an Activity Entry' }).click();
+  await expect(page.getByText('Already logged today', { exact: true })).toHaveCount(1);
+  const tomorrow = await page.evaluate(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  });
+  await page.getByLabel('Occurred on').fill(tomorrow);
+  await expect(page.getByText('Already logged today', { exact: true })).toHaveCount(0);
+});
+
 test('Player backdates an Activity Entry and History uses occurred-on date order', async ({
   page,
 }) => {
