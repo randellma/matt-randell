@@ -70,7 +70,7 @@ try {
     throw new Error(`The acceptance stack exited with code ${stackExitCode}.`);
   }
 
-  exitCode = run('npx', ['playwright', 'test']);
+  exitCode = run('npx', ['playwright', 'test', ...process.argv.slice(2)]);
 } finally {
   const cleanupExitCode = run('docker', [
     'compose',
