@@ -9,6 +9,30 @@ type AuthRecord = Account | PendingAuthRecord;
 type AuthSession = { record: AuthRecord; token: string };
 type Game = { id: string; title: string };
 type OnboardingResult = { account: Account; game: Game };
+type Category = {
+  color: string;
+  id: string;
+  name: string;
+  plantFamily: string;
+  sortOrder: number;
+};
+type Activity = {
+  active: boolean;
+  category: string;
+  id: string;
+  name: string;
+  points: number;
+  sortOrder: number;
+};
+type ActivityEntry = { account: string; id: string; occurredOn: string; points: number };
+type ActivityEntryItem = {
+  activityName: string;
+  categoryColor: string;
+  categoryName: string;
+  entry: string;
+  points: number;
+};
+type RecordList<T> = { items: T[]; page: number; totalPages: number };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -25,6 +49,22 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!response.ok) throw new Error(`Life Points request returned ${response.status}`);
   return response.json() as Promise<T>;
+}
+
+async function apiListAll<T>(collection: string, token: string): Promise<T[]> {
+  const items: T[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const result = await apiRequest<RecordList<T>>(
+      `/api/collections/${collection}/records?perPage=200&page=${page}`,
+      { headers: { Authorization: token } },
+    );
+    items.push(...result.items);
+    totalPages = result.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+  return items;
 }
 
 function readSession(): AuthSession | null {
@@ -161,7 +201,63 @@ function renderOnboarding(session: AuthSession, message = ''): void {
   });
 }
 
-function renderHome(account: Account, game: Game): void {
+function localCalendarDate(): string {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+async function renderHome(session: AuthSession, game: Game, message = ''): Promise<void> {
+  const account = session.record as Account;
+  const [categories, activities, gameEntries, entryItems] = await Promise.all([
+    apiListAll<Category>('categories', session.token),
+    apiListAll<Activity>('activities', session.token),
+    apiListAll<ActivityEntry>('activity_entries', session.token),
+    apiListAll<ActivityEntryItem>('activity_entry_items', session.token),
+  ]);
+  categories.sort((left, right) => left.sortOrder - right.sortOrder);
+  const activeActivities = activities
+    .filter((activity) => activity.active)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+  const entries = gameEntries
+    .filter((entry) => entry.account === account.id)
+    .sort((left, right) => right.occurredOn.localeCompare(left.occurredOn));
+  const lifetimePoints = entries.reduce((total, entry) => total + entry.points, 0);
+  const activitiesByCategory = new Map<string, Activity[]>();
+  for (const activity of activeActivities) {
+    const categoryActivities = activitiesByCategory.get(activity.category) ?? [];
+    categoryActivities.push(activity);
+    activitiesByCategory.set(activity.category, categoryActivities);
+  }
+  const itemsByEntry = new Map<string, ActivityEntryItem[]>();
+  for (const item of entryItems) {
+    const entryItems = itemsByEntry.get(item.entry) ?? [];
+    entryItems.push(item);
+    itemsByEntry.set(item.entry, entryItems);
+  }
+  const categorySections = categories
+    .filter((category) => activitiesByCategory.has(category.id))
+    .map((category) => `
+      <section class="activity-group" aria-labelledby="category-${category.id}">
+        <h2 id="category-${category.id}"><span class="category-dot" style="--category-color: ${category.color}" aria-hidden="true"></span>${escapeHtml(category.name)}</h2>
+        <div class="activity-options">
+          ${(activitiesByCategory.get(category.id) ?? []).map((activity) => `
+            <label class="activity-option">
+              <input type="checkbox" name="activity" value="${activity.id}" aria-label="${escapeHtml(activity.name)}, ${activity.points} points" />
+              <span>${escapeHtml(activity.name)}</span><strong>${activity.points}</strong>
+            </label>`).join('')}
+        </div>
+      </section>`).join('');
+  const historyItems = entries.map((entry) => {
+    const entryItems = itemsByEntry.get(entry.id) ?? [];
+    const dateLabel = entry.occurredOn === localCalendarDate() ? 'Today' : entry.occurredOn;
+    return `<li class="history-entry">
+      <div><time datetime="${entry.occurredOn}">${dateLabel}</time>${entryItems.map((item) => `<strong>${escapeHtml(item.activityName)}</strong><span>${escapeHtml(item.categoryName)}</span>`).join('')}</div>
+      <b>+${entry.points} points</b>
+    </li>`;
+  }).join('');
+
   app.innerHTML = `
     <main class="home-shell">
       <header class="home-header"><p class="eyebrow">Life Points</p><button class="text-button" id="sign-out" type="button">Sign out</button></header>
@@ -169,13 +265,57 @@ function renderHome(account: Account, game: Game): void {
         <span class="home-sprout" aria-hidden="true">🌱</span>
         <h1 id="home-title">Welcome, ${escapeHtml(account.playerName)}</h1>
         <p>${escapeHtml(game.title)}</p>
-        <div class="empty-garden"><strong>Your garden is ready to grow.</strong><span>Every good thing will have a place here.</span></div>
+        <div class="point-totals">
+          <div><span>Lifetime Points</span><strong>${lifetimePoints}</strong></div>
+          <div><span>Available Points</span><strong>${lifetimePoints}</strong></div>
+        </div>
+        <button class="quick-add" id="quick-add" type="button">Log an Activity Entry</button>
+        <p class="save-message" role="status" aria-live="polite">${escapeHtml(message)}</p>
       </section>
+      <section class="history-card" aria-labelledby="history-title">
+        <h2 id="history-title">History</h2>
+        ${historyItems === '' ? '<p class="history-empty">Your first good thing will appear here.</p>' : `<ol class="history-list">${historyItems}</ol>`}
+      </section>
+      <dialog class="quick-add-sheet" id="quick-add-sheet" aria-labelledby="quick-add-title">
+        <form id="quick-add-form">
+          <header><div><p class="eyebrow">Quick-add</p><h1 id="quick-add-title">What felt good today?</h1></div><button class="close-sheet" id="close-sheet" type="button" aria-label="Close">×</button></header>
+          <div class="activity-groups">${categorySections}</div>
+          <button class="save-entry" type="submit" disabled>Save Activity Entry</button>
+        </form>
+      </dialog>
     </main>`;
   document.querySelector<HTMLButtonElement>('#sign-out')!.addEventListener('click', () => {
     localStorage.removeItem(sessionKey);
     renderWelcome();
   });
+  const sheet = document.querySelector<HTMLDialogElement>('#quick-add-sheet')!;
+  const form = document.querySelector<HTMLFormElement>('#quick-add-form')!;
+  const saveButton = form.querySelector<HTMLButtonElement>('.save-entry')!;
+  document.querySelector<HTMLButtonElement>('#quick-add')!.addEventListener('click', () => sheet.showModal());
+  document.querySelector<HTMLButtonElement>('#close-sheet')!.addEventListener('click', () => sheet.close());
+  form.addEventListener('change', () => {
+    saveButton.disabled = form.querySelectorAll<HTMLInputElement>('input[name="activity"]:checked').length < 1;
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const activityIds = new FormData(form).getAll('activity').map((value) => value.toString());
+    if (activityIds.length < 1) return;
+    saveButton.disabled = true;
+    void saveActivityEntry(session, game, activityIds);
+  });
+}
+
+async function saveActivityEntry(session: AuthSession, game: Game, activityIds: string[]): Promise<void> {
+  try {
+    const result = await apiRequest<{ entry: { points: number } }>('/api/life-points/v1/activity-entries', {
+      body: JSON.stringify({ activityIds, occurredOn: localCalendarDate() }),
+      headers: { Authorization: session.token },
+      method: 'POST',
+    });
+    await renderHome(session, game, `${result.entry.points} points earned`);
+  } catch {
+    await renderHome(session, game, 'We could not save that Activity Entry. Please try again.');
+  }
 }
 
 async function sendOtp(email: string): Promise<void> {
@@ -231,7 +371,7 @@ async function provisionGame(
     });
     const provisionedSession = { ...session, record: result.account };
     saveSession(provisionedSession);
-    renderHome(result.account, result.game);
+    await renderHome(provisionedSession, result.game);
   } catch {
     renderOnboarding(session, 'We could not create your Game just now. Please try again.');
   }
@@ -251,7 +391,7 @@ async function openHome(session: AuthSession): Promise<void> {
     const game = await apiRequest<Game>(`/api/collections/games/records/${account.game}`, {
       headers: { Authorization: session.token },
     });
-    renderHome(account, game);
+    await renderHome({ ...session, record: account }, game);
   } catch {
     localStorage.removeItem(sessionKey);
     renderWelcome('Your session has ended. Ask for a new code to come back in.');
