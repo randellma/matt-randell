@@ -438,6 +438,14 @@ button:focus-visible {
   color: #9d2854;
 }
 
+.activity-option small {
+  display: block;
+  margin-top: 2px;
+  color: #7b6870;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .save-entry {
   margin-top: 0;
 }
